@@ -207,6 +207,8 @@ assert(!/setInterval\(\s*tick\s*,\s*800\s*\)/.test(pluginSource), '房间背景�
 assert(/BHChat\.watch|this\.watch|\.watch\(/.test(pluginSource), '房间背景应使用 BHChat.watch');
 assert(/registerPanel/.test(pluginSource), '房间背景 UI 应通过 registerPanel 挂到设置页');
 assert(/bhchat-btn-primary/.test(pluginSource), '房间背景保存应使用主按钮而不是文本行');
+assert(/type:\s*'file'|accept:\s*'image/.test(pluginSource), '房间背景应支持从本地选择图片');
+assert(/fileToDataUrl|readAsDataURL|toDataURL/.test(pluginSource), '本地图片应转为可持久化的 data URL');
 assert(!/pointer-keyset/.test(pluginSource), '房间背景设置不应再用 pointer-keyset 充当按钮');
 
 const ttsSource = fs.readFileSync(
@@ -214,6 +216,8 @@ const ttsSource = fs.readFileSync(
   'utf8',
 );
 assert(/registerPanel/.test(ttsSource), 'TTS 设置应通过 registerPanel 挂到设置页');
+assert(/type:\s*'number'/.test(ttsSource), '语速应使用数字输入框');
+assert(!/不会读历史记录/.test(ttsSource), 'TTS 设置页不应再放说明长文');
 assert(/bhchat-switch/.test(ttsSource) && /bhchat-btn-primary/.test(ttsSource), 'TTS 设置应使用开关与主按钮');
 assert(!/pointer-keyset/.test(ttsSource), 'TTS 设置不应再用 pointer-keyset 充当按钮');
 assert(/speechSynthesis/.test(ttsSource), 'TTS 应使用 Web Speech API');

@@ -551,42 +551,39 @@
       name: 'BhchatChannelTtsPanel',
       data: function () {
         return {
-          rate: Math.round(settings.rate * 100),
+          rate: settings.rate,
           volume: Math.round(settings.volume * 100),
           speakName: settings.speakName,
-          hookStatus: hookStatus,
-          lastStatus: lastStatus,
           hasSynth: !!getSynth(),
         };
       },
       mounted: function () {
         this.syncFromPlugin();
-        var self = this;
-        this._timer = setInterval(function () {
-          self.hookStatus = hookStatus;
-          self.lastStatus = lastStatus;
-        }, 500);
-      },
-      beforeDestroy: function () {
-        if (this._timer) clearInterval(this._timer);
       },
       methods: {
         syncFromPlugin: function () {
-          this.rate = Math.round(settings.rate * 100);
+          this.rate = settings.rate;
           this.volume = Math.round(settings.volume * 100);
           this.speakName = settings.speakName;
-          this.hookStatus = hookStatus;
-          this.lastStatus = lastStatus;
           this.hasSynth = !!getSynth();
         },
         persist: function () {
-          settings.rate = clamp(this.rate / 100, 0.5, 2);
+          settings.rate = clamp(Number(this.rate), 0.5, 2);
           settings.volume = clamp(this.volume / 100, 0, 1);
           settings.speakName = !!this.speakName;
           saveSettings();
         },
-        onTest: function () {
+        onRateInput: function (e) {
+          this.rate = e.target.value;
+        },
+        onRateCommit: function () {
+          var n = Number(this.rate);
+          if (isNaN(n)) n = 1;
+          this.rate = Math.round(clamp(n, 0.5, 2) * 100) / 100;
           this.persist();
+        },
+        onTest: function () {
+          this.onRateCommit();
           speakTest();
         },
         onStop: function () {
@@ -625,11 +622,6 @@
         }
         var children = [
           h('div', { class: 'cell-title' }, '频道文字消息 TTS'),
-          h(
-            'p',
-            { class: 'bhchat-hint' },
-            '朗读当前正在看的频道的新消息（含语音房文字）。不会读历史记录、自己发的消息、私聊或纯表情。',
-          ),
         ];
         if (!this.hasSynth) {
           children.push(h('p', { class: 'bhchat-warn' }, '当前环境没有 Web Speech API，无法朗读。'));
@@ -637,17 +629,15 @@
         children.push(
           h('div', { class: 'bhchat-list' }, [
             h('div', { class: 'row' }, [
-              h('span', '语速 ' + (this.rate / 100).toFixed(2)),
+              h('span', '语速'),
               h('input', {
-                class: 'bhchat-native-range',
-                style: rangeStyle(this.rate, 50, 200),
-                attrs: { type: 'range', min: '50', max: '200' },
-                domProps: { value: String(this.rate) },
+                class: 'bhchat-native-input bhchat-input-compact',
+                attrs: { type: 'number', min: '0.5', max: '2', step: '0.05' },
+                domProps: { value: this.rate },
                 on: {
-                  input: function (e) {
-                    self.rate = Number(e.target.value);
-                    self.persist();
-                  },
+                  input: this.onRateInput,
+                  change: this.onRateCommit,
+                  blur: this.onRateCommit,
                 },
               }),
             ]),
@@ -690,12 +680,6 @@
             btn('立即停止', 'danger', this.onStop),
           ]),
         );
-        if (this.hookStatus) {
-          children.push(h('p', { class: 'bhchat-hint' }, this.hookStatus));
-        }
-        if (this.lastStatus) {
-          children.push(h('p', { class: 'bhchat-hint' }, this.lastStatus));
-        }
         return h('div', children);
       },
     };

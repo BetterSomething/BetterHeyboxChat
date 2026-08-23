@@ -212,7 +212,6 @@
 
         var pluginChildren = [
           h('div', { class: 'cell-title' }, '已安装插件'),
-          h('p', { class: 'bhchat-hint' }, '开关在重启客户端后生效。'),
           h('div', { class: 'bhchat-list' }, pluginRows),
           h('div', { class: 'bhchat-actions' }, [hBtn(h, '立即重启客户端', 'primary', this.onRestart)]),
         ];
@@ -229,7 +228,6 @@
 
         var dtChildren = [
           h('div', { class: 'cell-title' }, '开发者工具'),
-          h('p', { class: 'bhchat-hint' }, '启用黑盒语音原生 DevTools（F12 / Ctrl+Shift+I）。'),
           h('div', { class: 'bhchat-list' }, [
             h(
               'div',
@@ -241,9 +239,6 @@
             hBtn(h, '立即打开 DevTools', 'secondary', this.onOpenDevTools),
           ]),
         ];
-        if (this.devToolsStatus) {
-          dtChildren.push(h('p', { class: 'bhchat-hint' }, this.devToolsStatus));
-        }
 
         return h(
           'div',
@@ -312,6 +307,10 @@
       '.betterheyboxchat-setting-block .bhchat-native-input{width:100%;box-sizing:border-box;height:32px;padding:0 10px;border:none;border-radius:5px;background:var(--opacity-1,rgba(0,0,0,.2));color:var(--text-1,#f2f3f5);font-size:13px;outline:none}',
       '.betterheyboxchat-setting-block .bhchat-native-input:focus{box-shadow:0 0 0 1px var(--brand-text,#7dd95e)}',
       '.betterheyboxchat-setting-block .bhchat-native-input:disabled{opacity:.5}',
+      '.betterheyboxchat-setting-block .bhchat-input-compact{width:80px;flex:none;text-align:center;padding:0 8px}',
+      '.betterheyboxchat-setting-block .bhchat-file-row{display:flex;gap:8px;align-items:center}',
+      '.betterheyboxchat-setting-block .bhchat-file-row .bhchat-native-input{flex:1;min-width:0}',
+      '.betterheyboxchat-setting-block .bhchat-file-hidden{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}',
       '.betterheyboxchat-setting-block .bhchat-native-range{-webkit-appearance:none;appearance:none;flex:1;max-width:180px;height:4px;border-radius:2px;outline:none;cursor:pointer}',
       '.betterheyboxchat-setting-block .bhchat-native-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;border:none;box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:pointer}',
       '.betterheyboxchat-setting-block .bhchat-native-range:disabled{opacity:.5;cursor:not-allowed}',

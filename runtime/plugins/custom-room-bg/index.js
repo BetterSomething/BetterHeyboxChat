@@ -56,6 +56,44 @@
     }
   }
 
+  function cssImageUrl(url) {
+    if (!url) return '';
+    return 'url(' + JSON.stringify(url) + ')';
+  }
+
+  function isDataUrl(url) {
+    return typeof url === 'string' && url.slice(0, 5) === 'data:';
+  }
+
+  function fileToDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) {
+        reject(new Error('未选择文件'));
+        return;
+      }
+      var objectUrl = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        var max = 1920;
+        var w = img.naturalWidth || img.width;
+        var h = img.naturalHeight || img.height;
+        var scale = Math.min(1, max / Math.max(w, h, 1));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(objectUrl);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('无法读取图片'));
+      };
+      img.src = objectUrl;
+    });
+  }
+
   function getHost() {
     return document.querySelector('.layout-content-wrapper');
   }
@@ -99,7 +137,7 @@
     var opacity = typeof config.opacity === 'number' ? config.opacity : 1;
     var blur = typeof config.blur === 'number' ? config.blur : 0;
 
-    layer.style.backgroundImage = 'url("' + config.url.replace(/"/g, '\\"') + '")';
+    layer.style.backgroundImage = cssImageUrl(config.url);
     layer.style.opacity = String(opacity);
     layer.style.filter = blur > 0 ? 'blur(' + blur + 'px)' : 'none';
     host.classList.add('bhchat-room-bg-hidden-official');
@@ -145,6 +183,7 @@
           url: url,
           opacity: options.opacity != null ? options.opacity : 1,
           blur: options.blur != null ? options.blur : 0,
+          localName: options.localName || '',
         };
         await saveMap();
         applyForRoom(roomId);
@@ -173,6 +212,7 @@
       data: function () {
         return {
           url: '',
+          localName: '',
           opacity: 100,
           blur: 0,
           roomName: '当前房间',
@@ -184,10 +224,15 @@
         previewStyle: function () {
           if (!this.url) return {};
           return {
-            backgroundImage: 'url("' + this.url.replace(/"/g, '\\"') + '")',
+            backgroundImage: cssImageUrl(this.url),
             opacity: String(this.opacity / 100),
             filter: this.blur > 0 ? 'blur(' + this.blur + 'px)' : 'none',
           };
+        },
+        urlFieldValue: function () {
+          if (this.localName) return this.localName;
+          if (isDataUrl(this.url)) return '本地图片';
+          return this.url;
         },
       },
       mounted: function () {
@@ -217,10 +262,12 @@
           var config = roomBg.get();
           if (config) {
             this.url = config.url || '';
+            this.localName = config.localName || (isDataUrl(this.url) ? '本地图片' : '');
             this.opacity = Math.round((config.opacity != null ? config.opacity : 1) * 100);
             this.blur = config.blur || 0;
           } else {
             this.url = '';
+            this.localName = '';
             this.opacity = 100;
             this.blur = 0;
           }
@@ -236,14 +283,22 @@
           }
           var url = (this.url || '').trim();
           var promise = url
-            ? roomBg.set(url, { opacity: this.opacity / 100, blur: this.blur })
+            ? roomBg.set(url, {
+                opacity: this.opacity / 100,
+                blur: this.blur,
+                localName: this.localName,
+              })
             : roomBg.clear();
-          Promise.resolve(promise).then(function () {
-            self.statusText = '已保存';
-            setTimeout(function () {
-              self.statusText = '';
-            }, 2000);
-          });
+          Promise.resolve(promise)
+            .then(function () {
+              self.statusText = '已保存';
+              setTimeout(function () {
+                self.statusText = '';
+              }, 2000);
+            })
+            .catch(function () {
+              self.statusText = '保存失败，图片可能太大';
+            });
         },
         onClear: function () {
           var self = this;
@@ -251,10 +306,37 @@
           if (!roomBg || !this.inRoom) return;
           Promise.resolve(roomBg.clear()).then(function () {
             self.url = '';
+            self.localName = '';
             self.opacity = 100;
             self.blur = 0;
             self.statusText = '已清除';
           });
+        },
+        onChooseFile: function () {
+          if (!this.inRoom) return;
+          var input = this.$refs && this.$refs.bgFile;
+          if (input) input.click();
+        },
+        onFileChange: function (e) {
+          var self = this;
+          var file = e && e.target && e.target.files && e.target.files[0];
+          if (e && e.target) e.target.value = '';
+          if (!file) return;
+          this.statusText = '正在载入图片…';
+          fileToDataUrl(file)
+            .then(function (dataUrl) {
+              self.url = dataUrl;
+              self.localName = file.name || '本地图片';
+              self.statusText = '';
+            })
+            .catch(function (err) {
+              self.statusText = (err && err.message) || '载入失败';
+            });
+        },
+        onUrlInput: function (e) {
+          var value = e.target.value;
+          this.localName = '';
+          this.url = value;
         },
       },
       render: function (h) {
@@ -289,11 +371,6 @@
         }
         var children = [
           h('div', { class: 'cell-title' }, '自定义房间背景'),
-          h(
-            'p',
-            { class: 'bhchat-hint' },
-            '为「' + this.roomName + '」设置本地背景图，仅你可见，不影响其他成员。',
-          ),
         ];
         if (!this.inRoom) {
           children.push(h('p', { class: 'bhchat-warn' }, '请先进入一个房间。'));
@@ -301,16 +378,25 @@
         children.push(
           h('div', { class: 'bhchat-field' }, [
             h('span', { class: 'bhchat-field-label' }, '图片 URL'),
-            h('input', {
-              class: 'bhchat-native-input',
-              attrs: { type: 'text', placeholder: 'https://...', disabled: !this.inRoom },
-              domProps: { value: this.url },
-              on: {
-                input: function (e) {
-                  self.url = e.target.value;
+            h('div', { class: 'bhchat-file-row' }, [
+              h('input', {
+                class: 'bhchat-native-input',
+                attrs: {
+                  type: 'text',
+                  placeholder: 'https:// 或选择本地图片',
+                  disabled: !this.inRoom,
                 },
-              },
-            }),
+                domProps: { value: this.urlFieldValue },
+                on: { input: this.onUrlInput },
+              }),
+              h('input', {
+                ref: 'bgFile',
+                class: 'bhchat-file-hidden',
+                attrs: { type: 'file', accept: 'image/*' },
+                on: { change: this.onFileChange },
+              }),
+              btn('本地图片', 'secondary', this.onChooseFile, !this.inRoom),
+            ]),
           ]),
           h('div', { class: 'bhchat-list' }, [
             h('div', { class: 'row' }, [
