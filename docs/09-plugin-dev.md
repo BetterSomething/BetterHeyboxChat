@@ -1,15 +1,17 @@
 # 插件开发指南
 
-面向要给 BetterHeyboxChat 写插件的人。API 细节见 [08-plugin-api.md](./08-plugin-api.md)，架构见 [04-architecture.md](./04-architecture.md)。
+面向要写插件的人。API 细节见 [08-plugin-api.md](./08-plugin-api.md)，架构见 [04-architecture.md](./04-architecture.md)。
 
 ## 环境
 
-| 项 | 值 |
-| --- | --- |
-| 客户端 | 黑盒语音 **1.56.0** |
-| 前端 | Vue **2.7 runtime-only** + Vuex + Webpack |
-| 注入点 | 渲染进程；不要改主进程 `.jsm` |
-| 调试 | 安装后 `F12` / `Ctrl+Shift+I`；右下角 **BH** 角标表示 runtime 已加载 |
+
+| 项   | 值                                                      |
+| --- | ------------------------------------------------------ |
+| 客户端 | 黑盒语音 **1.56.0**                                        |
+| 前端  | Vue **2.7 runtime-only** + Vuex + Webpack              |
+| 注入点 | 渲染进程；不要改主进程 `.jsm`                                     |
+| 调试  | 安装后 `F12` / `Ctrl+Shift+I`；右下角 **BH** 角标表示 runtime 已加载 |
+
 
 改仓库根目录 `runtime/` 后，用 **Debug** 安装器重装即可（不必 `cargo build`）。Release 安装器内嵌 runtime，改完要重新 `cargo build --release`。
 
@@ -31,13 +33,15 @@ runtime/plugins/my-plugin/
   "id": "my-plugin",
   "name": "我的插件",
   "version": "1.0.0",
+  "author": "你的名字",
+  "repository": "https://github.com/you/my-plugin",
   "minClientVersion": "1.56.0",
   "enabled": true,
   "entry": "index.js"
 }
 ```
 
-`plugins.json` 里对应一项，字段保持一致。`id` 必须与目录名相同。`enabled` 是默认值；用户可在设置里关掉，写入 `bhchat.plugins.enabled`，**重启后** loader 才跳过脚本。
+`plugins.json` 里对应一项，字段保持一致。`id` 必须与目录名相同。`author`、`repository` 会显示在设置页（仓库可点开）。`enabled` 是默认值；用户可在设置里关掉，写入 `bhchat.plugins.enabled`，**重启后** loader 才跳过脚本。
 
 ## 最小插件
 
@@ -70,7 +74,9 @@ runtime/plugins/my-plugin/
 1. IIFE + `'use strict'`，不要污染全局（除你文档化的 `BHChat.xxx`）
 2. 在 `onReady` 里启动：此时 `BHChat` 已在，且马上会 `_ready`
 3. 设置 UI 必须 `render(h)`，不能写 `template`
-4. 样式类可复用官方 Tailwind / 设置页的 `cell-title`、`row`、`text-tx-2`，以及框架的 `bhchat-native-input` / `bhchat-native-range`
+4. 控件要分样子：列表用 `row` + `bhchat-list`，开关用 `bhchat-switch`，按钮用 `bhchat-btn` / `bhchat-btn-primary`，输入用 `bhchat-native-input`，滑条用 `bhchat-native-range`。不要把按钮和开关做成 `row pointer-keyset` 文本行
+
+
 
 ## 订阅房间状态
 
@@ -115,11 +121,15 @@ await store.del('volume');
 - 需要立刻生效时调用 `BHChat.restart()`（与设置页「立即重启客户端」相同）
 - 插件自己不要在 `activate` 里再注册一份启停逻辑去热拆 DOM，除非你明确支持
 
+
+
 ## 打开设置
 
 ```javascript
 BHChat.openSettings('betterheyboxchat');
 ```
+
+
 
 ## 调试检查单
 
@@ -128,6 +138,8 @@ BHChat.openSettings('betterheyboxchat');
 3. Console 无 `[BetterHeyboxChat] boot failed`
 4. 你的 `registerPanel` 区块出现在插件开关和 DevTools 之间
 5. 关掉插件 → 点立即重启 → 该区块消失、入口脚本不再执行
+
+
 
 ## 禁止事项
 
@@ -140,6 +152,8 @@ BHChat.openSettings('betterheyboxchat');
 - 不要伪造服务端协议、破解权限、改 Overlay DLL
 - 不要把异常一路抛到未捕获（可能进官方 Sentry）；包在 `try/catch` 或让 `BHChat.on` 替你吞掉
 
+
+
 ## 参考实现
 
 内置 `runtime/plugins/custom-room-bg/`：
@@ -148,4 +162,10 @@ BHChat.openSettings('betterheyboxchat');
 - `registerPanel` 提供房间背景表单
 - `BHChat.roomBg` 作为该插件的公开命令
 
-复制该目录是最快的起步方式。
+内置 `runtime/plugins/channel-tts/`：
+
+- 经 `__bhchat_module_map__.EVENT_BUS` 订阅 `SOCKET_SEND_MESSAGE` / `SOCKET_USER_IM_MESSAGE`（不要写死模块数字 ID）
+- 只朗读当前正在看的频道的**新**消息（`channel_data` / `channelIMId` / 语音频道，含语音房文字），用 `window.speechSynthesis` 排队播放
+- `registerPanel` 提供语速、音量、是否读昵称、测试朗读、立即停止
+
+复制 `custom-room-bg` 目录是最快的起步方式。

@@ -259,20 +259,48 @@
       },
       render: function (h) {
         var self = this;
+        function rangeStyle(value, min, max) {
+          var pct = ((Number(value) - min) / (max - min)) * 100;
+          return {
+            background:
+              'linear-gradient(to right, var(--brand-text,#7dd95e) ' +
+              pct +
+              '%, var(--opacity-2,#ffffff14) ' +
+              pct +
+              '%)',
+          };
+        }
+        function btn(text, kind, onClick, disabled) {
+          return h(
+            'button',
+            {
+              class: {
+                'bhchat-btn': true,
+                'bhchat-btn-primary': kind === 'primary',
+                'bhchat-btn-secondary': kind === 'secondary',
+                'bhchat-btn-danger': kind === 'danger',
+                'is-disabled': !!disabled,
+              },
+              attrs: { type: 'button', disabled: !!disabled },
+              on: { click: onClick },
+            },
+            text,
+          );
+        }
         var children = [
           h('div', { class: 'cell-title' }, '自定义房间背景'),
           h(
             'p',
-            { class: 'text-tx-2 text-[13px] leading-[20px] tracking-[0.01em] mb-[8px]' },
+            { class: 'bhchat-hint' },
             '为「' + this.roomName + '」设置本地背景图，仅你可见，不影响其他成员。',
           ),
         ];
         if (!this.inRoom) {
-          children.push(h('p', { class: 'text-er-tx text-[13px] mb-[8px]' }, '请先进入一个房间。'));
+          children.push(h('p', { class: 'bhchat-warn' }, '请先进入一个房间。'));
         }
         children.push(
-          h('div', { class: 'row flex-col !items-stretch !h-auto !py-[8px] gap-[6px]' }, [
-            h('span', { class: 'text-tx-2 text-[12px]' }, '图片 URL'),
+          h('div', { class: 'bhchat-field' }, [
+            h('span', { class: 'bhchat-field-label' }, '图片 URL'),
             h('input', {
               class: 'bhchat-native-input',
               attrs: { type: 'text', placeholder: 'https://...', disabled: !this.inRoom },
@@ -284,42 +312,44 @@
               },
             }),
           ]),
-          h('div', { class: 'row pointer-keyset' }, [
-            h('span', '不透明度 ' + this.opacity + '%'),
-            h('input', {
-              class: 'bhchat-native-range',
-              attrs: { type: 'range', min: '20', max: '100', disabled: !this.inRoom },
-              domProps: { value: String(this.opacity) },
-              on: {
-                input: function (e) {
-                  self.opacity = Number(e.target.value);
+          h('div', { class: 'bhchat-list' }, [
+            h('div', { class: 'row' }, [
+              h('span', '不透明度 ' + this.opacity + '%'),
+              h('input', {
+                class: 'bhchat-native-range',
+                style: rangeStyle(this.opacity, 20, 100),
+                attrs: { type: 'range', min: '20', max: '100', disabled: !this.inRoom },
+                domProps: { value: String(this.opacity) },
+                on: {
+                  input: function (e) {
+                    self.opacity = Number(e.target.value);
+                  },
                 },
-              },
-            }),
-          ]),
-          h('div', { class: 'row pointer-keyset' }, [
-            h('span', '模糊 ' + this.blur + 'px'),
-            h('input', {
-              class: 'bhchat-native-range',
-              attrs: { type: 'range', min: '0', max: '30', disabled: !this.inRoom },
-              domProps: { value: String(this.blur) },
-              on: {
-                input: function (e) {
-                  self.blur = Number(e.target.value);
+              }),
+            ]),
+            h('div', { class: 'row' }, [
+              h('span', '模糊 ' + this.blur + 'px'),
+              h('input', {
+                class: 'bhchat-native-range',
+                style: rangeStyle(this.blur, 0, 30),
+                attrs: { type: 'range', min: '0', max: '30', disabled: !this.inRoom },
+                domProps: { value: String(this.blur) },
+                on: {
+                  input: function (e) {
+                    self.blur = Number(e.target.value);
+                  },
                 },
-              },
-            }),
+              }),
+            ]),
           ]),
           h('div', { class: 'bhchat-native-preview', style: this.previewStyle }),
-          h('div', { class: 'row pointer-keyset', on: { click: this.onSave } }, [
-            h('span', { class: 'text-bd-tx' }, '保存背景'),
-          ]),
-          h('div', { class: 'row pointer-keyset', on: { click: this.onClear } }, [
-            h('span', { class: 'text-er-tx' }, '清除背景'),
+          h('div', { class: 'bhchat-actions' }, [
+            btn('保存背景', 'primary', this.onSave, !this.inRoom),
+            btn('清除背景', 'danger', this.onClear, !this.inRoom),
           ]),
         );
         if (this.statusText) {
-          children.push(h('p', { class: 'text-tx-2 text-[12px] mt-[4px]' }, this.statusText));
+          children.push(h('p', { class: 'bhchat-hint' }, this.statusText));
         }
         return h('div', children);
       },

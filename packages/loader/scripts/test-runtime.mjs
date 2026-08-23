@@ -157,13 +157,32 @@ BHChat.registerPanel({
 const panels = BHChat.listPanels();
 assert(panels.length === 1 && panels[0].id === 'demo-panel', 'registerPanel / listPanels 应记录设置区块');
 
-BHChat.registerPlugin({ id: 'demo', name: '演示插件', version: '1.0.0', enabled: true, entry: 'index.js' });
+BHChat.registerPlugin({
+  id: 'demo',
+  name: '演示插件',
+  version: '1.0.0',
+  author: 'AwCat',
+  repository: 'https://github.com/BetterSomething/BetterHeyboxChat',
+  enabled: true,
+  entry: 'index.js',
+});
 assert(BHChat.isPluginEnabled('demo') === true, '未写用户覆盖时，manifest.enabled=true 应启用');
 
 await BHChat.setPluginEnabled('demo', false);
 assert(BHChat.isPluginEnabled('demo') === false, 'setPluginEnabled(false) 后应视为禁用（重启后不加载）');
 const listed = BHChat.listPlugins();
-assert(listed.some((p) => p.id === 'demo' && p.enabled === false), 'listPlugins 应反映用户禁用状态');
+const demo = listed.find((p) => p.id === 'demo');
+assert(demo && demo.enabled === false, 'listPlugins 应反映用户禁用状态');
+assert(demo.author === 'AwCat', 'listPlugins 应带上 author');
+assert(demo.repository === 'https://github.com/BetterSomething/BetterHeyboxChat', 'listPlugins 应带上 repository');
+
+const pluginsJson = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, '../../../runtime/plugins.json'), 'utf8'),
+);
+assert(
+  pluginsJson.every((p) => p.author && p.repository),
+  'plugins.json 每项应有 author 与 repository',
+);
 
 const ns = BHChat.storage.ns('demo');
 assert(ns && typeof ns.get === 'function' && typeof ns.set === 'function', 'storage.ns(pluginId) 应返回隔离存储');
@@ -187,10 +206,35 @@ const pluginSource = fs.readFileSync(
 assert(!/setInterval\(\s*tick\s*,\s*800\s*\)/.test(pluginSource), '房间背景不应再 800ms 轮询');
 assert(/BHChat\.watch|this\.watch|\.watch\(/.test(pluginSource), '房间背景应使用 BHChat.watch');
 assert(/registerPanel/.test(pluginSource), '房间背景 UI 应通过 registerPanel 挂到设置页');
+assert(/bhchat-btn-primary/.test(pluginSource), '房间背景保存应使用主按钮而不是文本行');
+assert(!/pointer-keyset/.test(pluginSource), '房间背景设置不应再用 pointer-keyset 充当按钮');
+
+const ttsSource = fs.readFileSync(
+  path.resolve(__dirname, '../../../runtime/plugins/channel-tts/index.js'),
+  'utf8',
+);
+assert(/registerPanel/.test(ttsSource), 'TTS 设置应通过 registerPanel 挂到设置页');
+assert(/bhchat-switch/.test(ttsSource) && /bhchat-btn-primary/.test(ttsSource), 'TTS 设置应使用开关与主按钮');
+assert(!/pointer-keyset/.test(ttsSource), 'TTS 设置不应再用 pointer-keyset 充当按钮');
+assert(/speechSynthesis/.test(ttsSource), 'TTS 应使用 Web Speech API');
+assert(/SOCKET_SEND_MESSAGE/.test(ttsSource) && /SOCKET_USER_IM_MESSAGE/.test(ttsSource), 'TTS 应订阅官方文字消息事件');
+assert(/channel_data/.test(ttsSource) && /cur_channel_data/.test(ttsSource), 'TTS 应按官方 channel_data 匹配当前频道（含语音房）');
+assert(!/__webpack_require__\(93509\)/.test(ttsSource), 'TTS 不应直接 require 设置模块');
+assert(!/'30570'|\"30570\"/.test(ttsSource), 'TTS 不应写死 EventBus 模块 ID');
+
+const pluginsManifest = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, '../../../runtime/plugins.json'), 'utf8'),
+);
+assert(
+  pluginsManifest.some((p) => p.id === 'channel-tts' && p.entry === 'index.js'),
+  'plugins.json 应注册 channel-tts',
+);
 
 const hookSource = fs.readFileSync(path.resolve(__dirname, '../../../runtime/webpack-hook.js'), 'utf8');
 assert(/listPanels|registerPanel/.test(hookSource), '设置页应渲染已注册 panel');
 assert(/立即重启|restart\(/.test(hookSource), '设置页应提供立即重启按钮');
+assert(/bhchat-btn-primary/.test(hookSource) && /bhchat-switch/.test(hookSource), '设置页应区分主按钮与开关样式');
+assert(!/pointer-keyset/.test(hookSource), '设置页不应再用 pointer-keyset 把按钮做成列表行');
 
 console.log('OK: BHChat Phase 2 API / 插件启停 / watch / panel');
 process.exit(0);

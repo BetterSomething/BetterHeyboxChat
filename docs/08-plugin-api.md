@@ -120,7 +120,7 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 
 ```javascript
 {
-  id, name, version, entry, minClientVersion,
+  id, name, version, author, repository, entry, minClientVersion,
   enabled,   // 用户覆盖 ∪ manifest 默认
   loaded     // 本次进程是否已执行入口脚本
 }

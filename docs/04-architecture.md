@@ -87,6 +87,8 @@ runtime/plugins/
   "id": "custom-room-bg",
   "name": "自定义房间背景",
   "version": "1.0.0",
+  "author": "AwCat",
+  "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
   "minClientVersion": "1.56.0",
   "enabled": true,
   "entry": "index.js"

@@ -20,6 +20,30 @@
 
   window.__bhchat_module_map__ = MODULE_MAP;
 
+  function hSwitch(h, on) {
+    return h('span', { class: { 'bhchat-switch': true, on: !!on } }, [
+      h('span', { class: 'bhchat-switch-core' }),
+    ]);
+  }
+
+  function hBtn(h, text, kind, onClick, disabled) {
+    return h(
+      'button',
+      {
+        class: {
+          'bhchat-btn': true,
+          'bhchat-btn-primary': kind === 'primary',
+          'bhchat-btn-secondary': kind === 'secondary',
+          'bhchat-btn-danger': kind === 'danger',
+          'is-disabled': !!disabled,
+        },
+        attrs: { type: 'button', disabled: !!disabled },
+        on: { click: onClick || function () {} },
+      },
+      text,
+    );
+  }
+
   function buildSettingsComponent() {
     return {
       name: COMPONENT_NAME,
@@ -134,48 +158,69 @@
       },
       render: function (h) {
         var self = this;
-        var pluginChildren = [
-          h('div', { class: 'cell-title' }, '已安装插件'),
-          h(
-            'p',
-            { class: 'text-tx-2 text-[13px] leading-[20px] tracking-[0.01em] mb-[8px]' },
-            '开关在重启客户端后生效。',
-          ),
-        ];
+        var pluginRows = [];
         if (!this.plugins.length) {
-          pluginChildren.push(h('p', { class: 'text-tx-2 text-[13px]' }, '暂无插件。'));
-        }
-        this.plugins.forEach(function (plugin) {
-          pluginChildren.push(
-            h(
-              'div',
-              {
-                class: 'row pointer-keyset',
-                on: {
-                  click: function () {
-                    self.onTogglePlugin(plugin);
+          pluginRows.push(h('p', { class: 'bhchat-hint' }, '暂无插件。'));
+        } else {
+          this.plugins.forEach(function (plugin) {
+            var pending = plugin.enabled !== plugin.loaded;
+            var subParts = ['v' + plugin.version];
+            if (plugin.author) subParts.push(plugin.author);
+            if (pending) subParts.push('重启后生效');
+            var subChildren = [h('span', subParts.join(' · '))];
+            if (plugin.repository) {
+              subChildren.push(
+                h(
+                  'a',
+                  {
+                    class: 'bhchat-link',
+                    attrs: { href: plugin.repository, target: '_blank' },
+                    on: {
+                      click: function (e) {
+                        if (e && e.preventDefault) e.preventDefault();
+                        if (e && e.stopPropagation) e.stopPropagation();
+                        window.open(plugin.repository, '_blank');
+                      },
+                    },
+                  },
+                  '仓库',
+                ),
+              );
+            }
+            pluginRows.push(
+              h(
+                'div',
+                {
+                  class: 'row bhchat-row-click',
+                  on: {
+                    click: function () {
+                      self.onTogglePlugin(plugin);
+                    },
                   },
                 },
-              },
-              [
-                h('span', plugin.name + '  v' + plugin.version),
-                h('span', { class: 'text-tx-2 text-[13px]' }, plugin.enabled ? '已启用' : '已禁用'),
-              ],
-            ),
-          );
-        });
-        pluginChildren.push(
-          h('div', { class: 'row pointer-keyset', on: { click: this.onRestart } }, [
-            h('span', { class: 'text-bd-tx' }, '立即重启客户端'),
-          ]),
-        );
+                [
+                  h('div', { class: 'bhchat-row-text' }, [
+                    h('div', plugin.name),
+                    h('div', { class: 'bhchat-row-sub' }, subChildren),
+                  ]),
+                  hSwitch(h, plugin.enabled),
+                ],
+              ),
+            );
+          });
+        }
+
+        var pluginChildren = [
+          h('div', { class: 'cell-title' }, '已安装插件'),
+          h('p', { class: 'bhchat-hint' }, '开关在重启客户端后生效。'),
+          h('div', { class: 'bhchat-list' }, pluginRows),
+          h('div', { class: 'bhchat-actions' }, [hBtn(h, '立即重启客户端', 'primary', this.onRestart)]),
+        ];
         if (this.pendingRestart) {
-          pluginChildren.push(
-            h('p', { class: 'text-tx-2 text-[12px] mt-[4px]' }, '插件开关已更改，重启后生效。'),
-          );
+          pluginChildren.push(h('p', { class: 'bhchat-hint' }, '插件开关已更改，重启后生效。'));
         }
         if (this.restartStatus) {
-          pluginChildren.push(h('p', { class: 'text-tx-2 text-[12px] mt-[4px]' }, this.restartStatus));
+          pluginChildren.push(h('p', { class: 'bhchat-hint' }, this.restartStatus));
         }
 
         var panelNodes = this.panels.map(function (panel) {
@@ -184,21 +229,20 @@
 
         var dtChildren = [
           h('div', { class: 'cell-title' }, '开发者工具'),
-          h(
-            'p',
-            { class: 'text-tx-2 text-[13px] leading-[20px] tracking-[0.01em] mb-[8px]' },
-            '启用黑盒语音原生 DevTools（F12 / Ctrl+Shift+I）。',
-          ),
-          h('div', { class: 'row pointer-keyset', on: { click: this.onToggleDevTools } }, [
-            h('span', '启用原生 DevTools'),
-            h('span', { class: 'text-tx-2 text-[13px]' }, this.devToolsEnabled ? '已启用' : '未启用'),
+          h('p', { class: 'bhchat-hint' }, '启用黑盒语音原生 DevTools（F12 / Ctrl+Shift+I）。'),
+          h('div', { class: 'bhchat-list' }, [
+            h(
+              'div',
+              { class: 'row bhchat-row-click', on: { click: this.onToggleDevTools } },
+              [h('span', '启用原生 DevTools'), hSwitch(h, this.devToolsEnabled)],
+            ),
           ]),
-          h('div', { class: 'row pointer-keyset', on: { click: this.onOpenDevTools } }, [
-            h('span', { class: 'text-bd-tx' }, '立即打开 DevTools'),
+          h('div', { class: 'bhchat-actions' }, [
+            hBtn(h, '立即打开 DevTools', 'secondary', this.onOpenDevTools),
           ]),
         ];
         if (this.devToolsStatus) {
-          dtChildren.push(h('p', { class: 'text-tx-2 text-[12px] mt-[4px]' }, this.devToolsStatus));
+          dtChildren.push(h('p', { class: 'bhchat-hint' }, this.devToolsStatus));
         }
 
         return h(
@@ -208,17 +252,19 @@
             h('p', { class: 'title' }, 'BetterHeyboxChat'),
             h('div', { class: 'cell' }, [
               h('div', { class: 'cell-title' }, '框架'),
-              h('div', { class: 'row pointer-keyset' }, [
-                h('span', '版本'),
-                h('span', { class: 'text-tx-2 text-[13px]' }, this.frameworkVersion),
-              ]),
-              h('div', { class: 'row pointer-keyset' }, [
-                h('span', '客户端'),
-                h(
-                  'span',
-                  { class: 'text-tx-2 text-[13px]' },
-                  (window.BHChat && window.BHChat.clientVersion) || 'unknown',
-                ),
+              h('div', { class: 'bhchat-list' }, [
+                h('div', { class: 'row' }, [
+                  h('span', '版本'),
+                  h('span', { class: 'bhchat-row-value' }, this.frameworkVersion),
+                ]),
+                h('div', { class: 'row' }, [
+                  h('span', '客户端'),
+                  h(
+                    'span',
+                    { class: 'bhchat-row-value' },
+                    (window.BHChat && window.BHChat.clientVersion) || 'unknown',
+                  ),
+                ]),
               ]),
             ]),
             h('div', { class: 'cell' }, pluginChildren),
@@ -234,12 +280,44 @@
     if (document.getElementById('bhchat-native-settings-style')) return;
     var style = document.createElement('style');
     style.id = 'bhchat-native-settings-style';
-    style.textContent =
-      '.betterheyboxchat-setting-block .bhchat-native-input{width:100%;box-sizing:border-box;height:32px;padding:0 10px;border:none;border-radius:5px;background:var(--opacity-1,rgba(0,0,0,.2));color:var(--text-1,#f2f3f5);font-size:13px;outline:none}' +
-      '.betterheyboxchat-setting-block .bhchat-native-input:focus{box-shadow:0 0 0 1px var(--brand-fill,#4dc38a)}' +
-      '.betterheyboxchat-setting-block .bhchat-native-input:disabled{opacity:.5}' +
-      '.betterheyboxchat-setting-block .bhchat-native-range{flex:1;max-width:160px;accent-color:var(--brand-fill,#4dc38a)}' +
-      '.betterheyboxchat-setting-block .bhchat-native-preview{height:120px;margin:8px 0;border-radius:8px;background:var(--opacity-1,rgba(0,0,0,.2)) center/cover no-repeat;border:1px solid var(--opacity-2,rgba(255,255,255,.08))}';
+    style.textContent = [
+      '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-list{border-radius:5px;overflow:hidden}',
+      '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-list .row{text-align:left}',
+      '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-list .row+.row{box-shadow:inset 0 1px 0 var(--opacity-1,rgba(255,255,255,.06))}',
+      '.betterheyboxchat-setting-block .bhchat-row-click{cursor:pointer}',
+      '.betterheyboxchat-setting-block .bhchat-row-click:hover{filter:brightness(1.08)}',
+      '.betterheyboxchat-setting-block .bhchat-row-text{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;flex:1;padding-right:12px}',
+      '.betterheyboxchat-setting-block .bhchat-row-sub{font-size:12px;line-height:16px;color:var(--text-3,#8b8e93);display:flex;align-items:center;flex-wrap:wrap;gap:6px}',
+      '.betterheyboxchat-setting-block .bhchat-row-value{color:var(--text-3,#8b8e93);font-size:13px}',
+      '.betterheyboxchat-setting-block .bhchat-link{color:var(--brand-text,#7dd95e);text-decoration:none;cursor:pointer}',
+      '.betterheyboxchat-setting-block .bhchat-link:hover{text-decoration:underline}',
+      '.betterheyboxchat-setting-block .bhchat-hint{color:var(--text-3,#8b8e93);font-size:12px;line-height:20px;letter-spacing:.04em;margin:0 0 8px}',
+      '.betterheyboxchat-setting-block .bhchat-hint+.bhchat-list,.betterheyboxchat-setting-block .cell-title+.bhchat-list{margin-top:0}',
+      '.betterheyboxchat-setting-block .bhchat-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 0 4px}',
+      '.betterheyboxchat-setting-block .bhchat-btn{appearance:none;-webkit-appearance:none;display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;border:none;border-radius:5px;font-family:inherit;font-size:14px;font-weight:700;line-height:18px;letter-spacing:.01em;cursor:pointer;user-select:none}',
+      '.betterheyboxchat-setting-block .bhchat-btn-primary{background:var(--brand-fill,#2d7d46);color:#fff}',
+      '.betterheyboxchat-setting-block .bhchat-btn-primary:hover{filter:brightness(1.08)}',
+      '.betterheyboxchat-setting-block .bhchat-btn-secondary{background:var(--fill-button,#4f545c);color:var(--text-1,#f2f3f5)}',
+      '.betterheyboxchat-setting-block .bhchat-btn-secondary:hover{filter:brightness(1.08)}',
+      '.betterheyboxchat-setting-block .bhchat-btn-danger{background:var(--f-error-fill,#d83c3f);color:#fff}',
+      '.betterheyboxchat-setting-block .bhchat-btn-danger:hover{filter:brightness(1.08)}',
+      '.betterheyboxchat-setting-block .bhchat-btn.is-disabled,.betterheyboxchat-setting-block .bhchat-btn:disabled{opacity:.4;cursor:not-allowed;filter:none}',
+      '.betterheyboxchat-setting-block .bhchat-switch{width:26px;height:16px;flex-shrink:0;display:inline-block;position:relative}',
+      '.betterheyboxchat-setting-block .bhchat-switch-core{display:block;width:100%;height:100%;border-radius:11px;background:rgba(0,0,0,.28);position:relative;transition:background-color .2s}',
+      '.betterheyboxchat-setting-block .bhchat-switch-core:after{content:"";position:absolute;width:12px;height:12px;top:2px;left:2px;border-radius:50%;background:var(--text-3,#8b8e93);transition:left .2s,background-color .2s}',
+      '.betterheyboxchat-setting-block .bhchat-switch.on .bhchat-switch-core{background:var(--brand-text,#7dd95e)}',
+      '.betterheyboxchat-setting-block .bhchat-switch.on .bhchat-switch-core:after{left:12px;background:#fff}',
+      '.betterheyboxchat-setting-block .bhchat-field{display:flex;flex-direction:column;align-items:stretch;gap:6px;margin:8px 0}',
+      '.betterheyboxchat-setting-block .bhchat-field-label{font-size:12px;line-height:20px;color:var(--text-3,#8b8e93)}',
+      '.betterheyboxchat-setting-block .bhchat-native-input{width:100%;box-sizing:border-box;height:32px;padding:0 10px;border:none;border-radius:5px;background:var(--opacity-1,rgba(0,0,0,.2));color:var(--text-1,#f2f3f5);font-size:13px;outline:none}',
+      '.betterheyboxchat-setting-block .bhchat-native-input:focus{box-shadow:0 0 0 1px var(--brand-text,#7dd95e)}',
+      '.betterheyboxchat-setting-block .bhchat-native-input:disabled{opacity:.5}',
+      '.betterheyboxchat-setting-block .bhchat-native-range{-webkit-appearance:none;appearance:none;flex:1;max-width:180px;height:4px;border-radius:2px;outline:none;cursor:pointer}',
+      '.betterheyboxchat-setting-block .bhchat-native-range::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;border:none;box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:pointer}',
+      '.betterheyboxchat-setting-block .bhchat-native-range:disabled{opacity:.5;cursor:not-allowed}',
+      '.betterheyboxchat-setting-block .bhchat-native-preview{height:120px;margin:8px 0;border-radius:8px;background:var(--opacity-1,rgba(0,0,0,.2)) center/cover no-repeat;border:1px solid var(--opacity-2,rgba(255,255,255,.08))}',
+      '.betterheyboxchat-setting-block .bhchat-warn{color:var(--f-error-text,#f64e54);font-size:13px;line-height:20px;margin:0 0 8px}',
+    ].join('');
     document.head.appendChild(style);
   }
 
