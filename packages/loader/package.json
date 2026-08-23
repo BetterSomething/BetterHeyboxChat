@@ -1,0 +1,23 @@
+{
+  "name": "@betterheyboxchat/loader",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BetterHeyboxChat 补丁安装器 CLI",
+  "type": "module",
+  "bin": {
+    "bhchat": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/copy-runtime.mjs",
+    "dev": "tsc --watch",
+    "start": "node dist/cli.js",
+    "test:patch": "pnpm build && node scripts/test-patch.mjs && node scripts/test-webpack-hook.mjs && node scripts/test-main-bridge.mjs && node scripts/test-runtime.mjs"
+  },
+  "dependencies": {
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}

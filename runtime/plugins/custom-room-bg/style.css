@@ -1,0 +1,15 @@
+/* 自定义房间背景 — 仅保留背景层样式 */
+.bhchat-room-bg-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: opacity 0.2s ease;
+}
+
+.bhchat-room-bg-hidden-official .layout-bg-wrapper {
+  opacity: 0 !important;
+}

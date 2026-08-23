@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# TypeScript / CLI 构建产物
+dist/
+*.tsbuildinfo
+
+# pnpm build 从仓库根 runtime/ 复制出来的副本，不要手改
+packages/loader/runtime/
+
+# Rust
+installer/target/
+**/*.rs.bk
+
+# Logs
+*.log
+pnpm-debug.log*
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# 调研笔记、逆向记录，只留本机
+internal-docs/
+
+MEMORY.md
+CHANGELOG.md

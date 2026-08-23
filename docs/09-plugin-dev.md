@@ -1,0 +1,151 @@
+# 插件开发指南
+
+面向要给 BetterHeyboxChat 写插件的人。API 细节见 [08-plugin-api.md](./08-plugin-api.md)，架构见 [04-architecture.md](./04-architecture.md)。
+
+## 环境
+
+| 项 | 值 |
+| --- | --- |
+| 客户端 | 黑盒语音 **1.56.0** |
+| 前端 | Vue **2.7 runtime-only** + Vuex + Webpack |
+| 注入点 | 渲染进程；不要改主进程 `.jsm` |
+| 调试 | 安装后 `F12` / `Ctrl+Shift+I`；右下角 **BH** 角标表示 runtime 已加载 |
+
+改仓库根目录 `runtime/` 后，用 **Debug** 安装器重装即可（不必 `cargo build`）。Release 安装器内嵌 runtime，改完要重新 `cargo build --release`。
+
+CLI：`pnpm build` 后 `pnpm bhchat install --yes`（需管理员；不会自动重启客户端）。
+
+## 目录与清单
+
+每个插件一份目录，并在 `runtime/plugins.json` 登记（loader 只读这份清单）：
+
+```
+runtime/plugins/my-plugin/
+  manifest.json
+  index.js
+  style.css          # 可选
+```
+
+```json
+{
+  "id": "my-plugin",
+  "name": "我的插件",
+  "version": "1.0.0",
+  "minClientVersion": "1.56.0",
+  "enabled": true,
+  "entry": "index.js"
+}
+```
+
+`plugins.json` 里对应一项，字段保持一致。`id` 必须与目录名相同。`enabled` 是默认值；用户可在设置里关掉，写入 `bhchat.plugins.enabled`，**重启后** loader 才跳过脚本。
+
+## 最小插件
+
+```javascript
+(function () {
+  'use strict';
+
+  function activate() {
+    BHChat.injectCSS('.my-plugin-mark{outline:1px dashed #6ee7b7}');
+    BHChat.registerPanel({
+      id: 'my-plugin',
+      title: '我的插件',
+      component: {
+        render: function (h) {
+          return h('div', [
+            h('div', { class: 'cell-title' }, '我的插件'),
+            h('p', { class: 'text-tx-2 text-[13px]' }, '已加载 v' + BHChat.version),
+          ]);
+        },
+      },
+    });
+  }
+
+  BHChat.onReady(activate);
+})();
+```
+
+要点：
+
+1. IIFE + `'use strict'`，不要污染全局（除你文档化的 `BHChat.xxx`）
+2. 在 `onReady` 里启动：此时 `BHChat` 已在，且马上会 `_ready`
+3. 设置 UI 必须 `render(h)`，不能写 `template`
+4. 样式类可复用官方 Tailwind / 设置页的 `cell-title`、`row`、`text-tx-2`，以及框架的 `bhchat-native-input` / `bhchat-native-range`
+
+## 订阅房间状态
+
+不要自己 `setInterval` 扫 Vuex。用 `watch`，并先读一次当前值：
+
+```javascript
+function currentRoom() {
+  return BHChat.mapState(['cur_room_data']).cur_room_data || null;
+}
+
+function onRoom(room) {
+  console.log(room ? room.room_id : '不在房间');
+}
+
+function activate() {
+  onRoom(currentRoom());
+  BHChat.watch(function () {
+    return currentRoom();
+  }, onRoom);
+}
+```
+
+`getVue()` / `getStore()` 在 `#app` 未挂载时可能为 `null`，`watch` 此时会退化为 500ms 轮询。
+
+## 本地存储
+
+```javascript
+var store = BHChat.storage.ns('my-plugin');
+
+await store.set('volume', 0.8);
+var volume = await store.get('volume'); // 0.8
+await store.del('volume');
+```
+
+不要用裸 key，以免和框架的 `bhchat.plugins.enabled`、`bhchat.custom_room_bg` 冲突。
+
+## 启用 / 禁用 / 重启
+
+用户在设置 → BetterHeyboxChat → 已安装插件里切换。当前进程**不会**卸载已运行的脚本。
+
+- `BHChat.listPlugins()` 里 `enabled !== loaded` 表示需要重启
+- 需要立刻生效时调用 `BHChat.restart()`（与设置页「立即重启客户端」相同）
+- 插件自己不要在 `activate` 里再注册一份启停逻辑去热拆 DOM，除非你明确支持
+
+## 打开设置
+
+```javascript
+BHChat.openSettings('betterheyboxchat');
+```
+
+## 调试检查单
+
+1. 重装补丁后右下角有 **BH**
+2. 设置侧栏有 BetterHeyboxChat（在「隐私设置」与「语音和屏幕共享」之间）
+3. Console 无 `[BetterHeyboxChat] boot failed`
+4. 你的 `registerPanel` 区块出现在插件开关和 DevTools 之间
+5. 关掉插件 → 点立即重启 → 该区块消失、入口脚本不再执行
+
+## 禁止事项
+
+项目边界：
+
+- 不要改 `ELECTRON_ENV`（`local` 会导致正式包拉调试前端，整窗灰屏）
+- 不要 Proxy / 替换 `electron.BrowserWindow`
+- 不要在 webpack 工厂未就绪时 `__webpack_require__` 官方模块
+- 不要 hook TRTC / 火山 RTC 音频管线
+- 不要伪造服务端协议、破解权限、改 Overlay DLL
+- 不要把异常一路抛到未捕获（可能进官方 Sentry）；包在 `try/catch` 或让 `BHChat.on` 替你吞掉
+
+## 参考实现
+
+内置 `runtime/plugins/custom-room-bg/`：
+
+- `BHChat.watch` 订阅 `cur_room_data`
+- `registerPanel` 提供房间背景表单
+- `BHChat.roomBg` 作为该插件的公开命令
+
+复制该目录是最快的起步方式。
