@@ -1,18 +1,25 @@
 # BetterHeyboxChat
 
-[![CodeTime Badge](https://shields.jannchie.com/endpoint?style=flat&color=0284c7&url=https%3A%2F%2Fcodetime.dev%2Fv3%2Fusers%2Fshield%3Fuid%3D559%26project%3DBetterHeyboxChat)](https://codetime.dev)
+---
 
-黑盒语音 Windows 客户端增强插件平台
+[假装这里有个 LOGO, LOGO 位招猪]  
+
+[黑盒语音](https://chat.xiaoheihe.cn/) Windows 客户端增强插件框架
 
 ## 安装
 
-写入 `Program Files` 需要管理员权限。  
+(若黑盒语音安装在 `Program Files` , 则安装器需要管理员权限)  
 若安装时黑盒语音已在运行, GUI 安装器会在安装/卸载后自动重启客户端
 
 ### GUI 一键傻瓜图形安装器
 
-1. `cargo build`
+#### 普通用户
 
+去仓库的 [Releases](https://github.com/BetterSomething/BetterHeyboxChat/releases/new) 里面下载`bhchat-installer.exe`并运行
+
+#### 开发者
+
+1. `cargo build`
 2. 运行 `installer/target/debug/bhchat-installer.exe`
 
 Debug 构建直接读仓库里的 `runtime/`，改插件不用重新编译安装器
@@ -53,7 +60,10 @@ pnpm bhchat install --path "D:\Program Files\Qingfeng\HeyboxChat" --yes
 ```
 installer/          Rust 安装器
 packages/loader/    命令行补丁器
-runtime/            运行时和插件
+runtime/            插件注入的运行时
 docs/               对外文档
 ```
 
+## 鸣谢
+
+各大 LLM

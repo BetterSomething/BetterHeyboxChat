@@ -120,13 +120,14 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 
 ```javascript
 {
-  id, name, version, author, repository, entry, minClientVersion,
-  enabled,   // 用户覆盖 ∪ manifest 默认
-  loaded     // 本次进程是否已执行入口脚本
+  id, name, version, author, repository, desc, entry, minClientVersion,
+  source,   // 'bundled' | 'user'
+  enabled,  // 用户覆盖 ∪ manifest 默认
+  loaded    // 本次进程是否已执行入口脚本
 }
 ```
 
-`enabled !== loaded` 表示需要重启。
+`desc` 为不超过 100 字的纯文本简介。`source === 'user'` 表示安装在用户数据目录。`enabled !== loaded` 表示需要重启。
 
 ### `isPluginEnabled(id): boolean`
 
@@ -140,6 +141,19 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 ### `restart()`
 
 调用 `electronAPI.restartApp()`。不可用时 reject。
+
+### `BHChat.plugins`
+
+用户插件装载（preload 实现）。安装/卸载后需重启才加载脚本。
+
+| 方法 | 说明 |
+| --- | --- |
+| `dataRoot()` | 当前用户数据根目录 |
+| `inspectZipPath(path)` / `inspectZipBuffer(buf)` / `inspectFolderPath(path)` | 解析包并返回洗白后的 manifest，不写盘 |
+| `installZipPath` / `installZipBuffer` / `installFolderPath` | 写入 `{dataRoot}/plugins/<id>/` |
+| `uninstall(id)` | 仅允许 `source=user` |
+
+inspect 结果供设置页确认框使用。`desc`/`name`/`author` 已去除 HTML 与控制字符。`repository` 只保留 http(s)。
 
 ## 存储
 
@@ -187,6 +201,22 @@ BHChat.roomBg.clear(roomId?)
 BHChat.roomBg.getAll()
 BHChat.roomBg.openPanel()
 BHChat.openRoomBgPanel()
+```
+
+`laughter-fav-fix` 启用后挂载：
+
+```javascript
+BHChat.laughterFav.refresh()
+BHChat.laughterFav.getStatus()
+BHChat.laughterFav.getSettings()
+```
+
+`screen-share-danmaku` 启用后挂载：
+
+```javascript
+BHChat.screenShareDanmaku.send(text)
+BHChat.screenShareDanmaku.getStatus()
+BHChat.screenShareDanmaku.getSettings()
 ```
 
 第三方插件不要依赖这些名字，除非你明确依赖该插件。

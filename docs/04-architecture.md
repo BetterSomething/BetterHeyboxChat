@@ -89,6 +89,7 @@ runtime/plugins/
   "version": "1.0.0",
   "author": "AwCat",
   "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+  "desc": "为当前房间设置仅自己可见的自定义背景图。",
   "minClientVersion": "1.56.0",
   "enabled": true,
   "entry": "index.js"
@@ -96,6 +97,8 @@ runtime/plugins/
 ```
 
 用户开关写入本地存储 `bhchat.plugins.enabled`，覆盖 manifest 默认值。禁用的插件**不加载脚本**，设置页仍列出以便重新打开。开关**重启后生效**；设置页有「立即重启客户端」按钮（`BHChat.restart()` → `electronAPI.restartApp`）。
+
+用户安装的插件不写入 `runtime/plugins/`，而在 `{dataRoot}/plugins/<id>/`。`dataRoot` 默认 `%APPDATA%\BetterHeyboxChat`，可用安装器「修改数据地址」更改。loader 合并 `plugins.json` 与用户目录扫描结果；内置 id 禁止覆盖。
 
 ## BHChat API（稳定面摘要）
 

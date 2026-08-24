@@ -35,13 +35,16 @@ runtime/plugins/my-plugin/
   "version": "1.0.0",
   "author": "你的名字",
   "repository": "https://github.com/you/my-plugin",
+  "desc": "简要说明这个插件能做什么（最多 100 字）",
   "minClientVersion": "1.56.0",
   "enabled": true,
   "entry": "index.js"
 }
 ```
 
-`plugins.json` 里对应一项，字段保持一致。`id` 必须与目录名相同。`author`、`repository` 会显示在设置页（仓库可点开）。`enabled` 是默认值；用户可在设置里关掉，写入 `bhchat.plugins.enabled`，**重启后** loader 才跳过脚本。
+`plugins.json` 里对应一项，字段保持一致。`id` 必须与目录名相同。`author`、`repository`、`desc` 会显示在设置页（仓库可点开）。`desc` 不超过 100 字，不要写 HTML。`enabled` 是默认值；用户可在设置里关掉，写入 `bhchat.plugins.enabled`，**重启后** loader 才跳过脚本。
+
+用户插件不要放进 `runtime/plugins/`。用设置页「插件市场」导入 zip 或文件夹，文件会写到安装器配置的数据目录（默认 `%APPDATA%\BetterHeyboxChat\plugins\<id>\`）。
 
 ## 最小插件
 
@@ -167,5 +170,16 @@ BHChat.openSettings('betterheyboxchat');
 - 经 `__bhchat_module_map__.EVENT_BUS` 订阅 `SOCKET_SEND_MESSAGE` / `SOCKET_USER_IM_MESSAGE`（不要写死模块数字 ID）
 - 只朗读当前正在看的频道的**新**消息（`channel_data` / `channelIMId` / 语音频道，含语音房文字），用 `window.speechSynthesis` 排队播放
 - `registerPanel` 提供语速、音量、是否读昵称、测试朗读、立即停止
+
+内置 `runtime/plugins/laughter-fav-fix/`：
+
+- 频道内收藏/取消收藏他人语音包后，补发官方 `Refresh_User_Laughter`（与语音包平台收藏相同）
+- 监听 Vuex `SET_FAVORITE_VOICE_PACK_IDS`；不写死模块数字 ID，不伪造收藏协议
+
+内置 `runtime/plugins/screen-share-danmaku/`：
+
+- 屏幕共享画面上以弹幕显示当前房间文字消息（同一套 `SOCKET_SEND_MESSAGE` / `SOCKET_USER_IM_MESSAGE`）
+- 检测官方 Vuex `screen_sharing_info` / `my_screen_sharing` / `screen_share_cpt_height`；弹幕层挂 `.cpt-screen-share-occupy`；输入框挂官方 `.screen-share-operate`
+- 画中画时把弹幕合成进 PiP（Electron 走 canvas 流）；发送走官方发信通道，不伪造协议、不碰 RTC
 
 复制 `custom-room-bg` 目录是最快的起步方式。
