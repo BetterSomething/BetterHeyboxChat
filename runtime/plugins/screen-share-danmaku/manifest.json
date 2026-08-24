@@ -1,0 +1,11 @@
+{
+  "id": "screen-share-danmaku",
+  "name": "屏幕共享增强",
+  "version": "1.0.0",
+  "author": "AwCat",
+    "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+    "desc": "在屏幕共享画面上显示弹幕，并支持直接发送文字",
+  "minClientVersion": "1.56.0",
+  "enabled": true,
+  "entry": "index.js"
+}

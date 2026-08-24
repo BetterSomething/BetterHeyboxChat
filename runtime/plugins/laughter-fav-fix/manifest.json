@@ -1,0 +1,11 @@
+{
+  "id": "laughter-fav-fix",
+  "name": "语音包收藏显示修复",
+  "version": "1.0.1",
+  "author": "AwCat",
+    "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+    "desc": "在频道内收藏或取消收藏语音包后立即刷新收藏列表",
+  "minClientVersion": "1.56.0",
+  "enabled": true,
+  "entry": "index.js"
+}

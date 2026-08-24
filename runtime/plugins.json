@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "author": "AwCat",
     "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+    "desc": "为当前房间设置仅自己可见的自定义背景图。",
     "minClientVersion": "1.56.0",
     "enabled": true,
     "entry": "index.js"
@@ -15,6 +16,40 @@
     "version": "1.0.0",
     "author": "AwCat",
     "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+    "desc": "朗读当前正在查看的频道里的新文字消息。",
+    "minClientVersion": "1.56.0",
+    "enabled": true,
+    "entry": "index.js"
+  },
+  {
+    "id": "laughter-fav-fix",
+    "name": "语音包收藏显示修复",
+    "version": "1.0.0",
+    "author": "AwCat",
+    "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+    "desc": "在频道内收藏或取消收藏语音包后，立即刷新收藏列表。",
+    "minClientVersion": "1.56.0",
+    "enabled": true,
+    "entry": "index.js"
+  },
+  {
+    "id": "screen-share-danmaku",
+    "name": "屏幕共享增强",
+    "version": "1.0.0",
+    "author": "AwCat",
+    "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+    "desc": "在屏幕共享画面上显示弹幕，并支持直接发送文字。",
+    "minClientVersion": "1.56.0",
+    "enabled": true,
+    "entry": "index.js"
+  },
+  {
+    "id": "marketplace",
+    "name": "插件市场",
+    "version": "1.0.0",
+    "author": "AwCat",
+    "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+    "desc": "从本地 zip 或文件夹安装第三方插件，安装前预览信息并确认。",
     "minClientVersion": "1.56.0",
     "enabled": true,
     "entry": "index.js"
