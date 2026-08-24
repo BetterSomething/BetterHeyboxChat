@@ -284,15 +284,20 @@ fn copy_dir_recursive(source: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// include_dir 给出的路径相对 runtime 根（例如 `lib/storage.js`），只能拼到部署根。
+fn embedded_out_path(deploy_root: &Path, file_rel: &Path) -> PathBuf {
+    deploy_root.join(file_rel)
+}
+
 #[cfg(not(debug_assertions))]
-fn write_embedded_dir(dir: &Dir<'_>, target: &Path) -> Result<(), String> {
+fn write_embedded_dir(dir: &Dir<'_>, deploy_root: &Path) -> Result<(), String> {
     for entry in dir.entries() {
         match entry {
             include_dir::DirEntry::Dir(sub) => {
-                write_embedded_dir(sub, &target.join(sub.path()))?;
+                write_embedded_dir(sub, deploy_root)?;
             }
             include_dir::DirEntry::File(file) => {
-                let out_path = target.join(file.path());
+                let out_path = embedded_out_path(deploy_root, file.path());
                 if let Some(parent) = out_path.parent() {
                     fs::create_dir_all(parent).map_err(io_err)?;
                 }
@@ -417,6 +422,26 @@ fn io_err(err: io::Error) -> String {
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    /// include_dir 的 File::path() / Dir::path() 都相对被 include 的 runtime 根。
+    /// 写出时必须拼到 deploy_root，不能先进入 lib/ 再拼接 `lib/storage.js`。
+    #[test]
+    fn embedded_nested_file_joins_from_deploy_root_only() {
+        let root = Path::new("betterheyboxchat");
+        assert_eq!(
+            embedded_out_path(root, Path::new("lib/storage.js")),
+            Path::new("betterheyboxchat/lib/storage.js")
+        );
+        assert_eq!(
+            embedded_out_path(root, Path::new("plugins/marketplace/index.js")),
+            Path::new("betterheyboxchat/plugins/marketplace/index.js")
+        );
+        assert_ne!(
+            embedded_out_path(root, Path::new("lib/storage.js")),
+            root.join("lib").join("lib/storage.js"),
+            "旧写法会把 storage.js 写到 lib/lib/ 下，Release 启动链在第一步就断"
+        );
+    }
 
     #[test]
     fn read_patch_state_works_with_verbatim_app_dir() {
