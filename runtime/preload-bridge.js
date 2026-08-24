@@ -86,6 +86,8 @@
     });
   }
 
+  var pluginStore = require('./lib/plugin-store.js');
+
   window.bhchatPreload = {
     version: '0.1.0',
     ready: true,
@@ -94,6 +96,39 @@
       getStatus: getNativeDevToolsStatus,
       setEnabled: setNativeDevToolsEnabled,
       open: openNativeDevTools,
+    },
+    plugins: {
+      dataRoot: function () {
+        return pluginStore.getDataRoot();
+      },
+      listUserPlugins: function () {
+        return pluginStore.listUserPlugins();
+      },
+      inspectZipPath: function (p) {
+        return pluginStore.inspectZipPath(p);
+      },
+      inspectZipBuffer: function (buf) {
+        return pluginStore.inspectZipBuffer(Buffer.from(buf));
+      },
+      inspectFolderPath: function (p) {
+        return pluginStore.inspectFolderPath(p);
+      },
+      installZipPath: function (p) {
+        return pluginStore.installZipPath(p);
+      },
+      installZipBuffer: function (buf) {
+        return pluginStore.installZipBuffer(Buffer.from(buf));
+      },
+      installFolderPath: function (p) {
+        return pluginStore.installFolderPath(p);
+      },
+      uninstall: function (id) {
+        return pluginStore.uninstall(id);
+      },
+      readUserFile: function (id, rel) {
+        var buf = pluginStore.readUserFile(id, rel);
+        return buf ? buf.toString('utf8') : null;
+      },
     },
   };
 

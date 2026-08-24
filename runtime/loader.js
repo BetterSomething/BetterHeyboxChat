@@ -22,6 +22,49 @@
     });
   }
 
+  function injectTextScript(code, id) {
+    var script = document.createElement('script');
+    script.text = code;
+    script.setAttribute('data-bhchat-plugin', id);
+    document.head.appendChild(script);
+  }
+
+  function loadUserPlugins() {
+    var api = window.bhchatPreload && window.bhchatPreload.plugins;
+    if (!api || typeof api.listUserPlugins !== 'function') {
+      return Promise.resolve();
+    }
+    var list = api.listUserPlugins() || [];
+    list.forEach(function (plugin) {
+      plugin.source = 'user';
+      if (window.BHChat.getPlugin && window.BHChat.getPlugin(plugin.id)) {
+        console.warn('[BetterHeyboxChat] skip user plugin, id 与内置冲突:', plugin.id);
+        return;
+      }
+      window.BHChat._registerPlugin(plugin, false);
+      if (window.BHChat.isPluginEnabled && !window.BHChat.isPluginEnabled(plugin.id)) {
+        console.log('[BetterHeyboxChat] user plugin disabled, skip:', plugin.id);
+        return;
+      }
+      var code = api.readUserFile(plugin.id, plugin.entry || 'index.js');
+      if (!code) {
+        console.warn('[BetterHeyboxChat] user plugin missing entry:', plugin.id);
+        return;
+      }
+      try {
+        injectTextScript(typeof code === 'string' ? code : String(code), plugin.id);
+        if (plugin.style && window.BHChat.injectCSS) {
+          var css = api.readUserFile(plugin.id, plugin.style);
+          if (css) window.BHChat.injectCSS(String(css));
+        }
+        window.BHChat._registerPlugin(plugin, true);
+      } catch (err) {
+        console.warn('[BetterHeyboxChat] user plugin load failed:', plugin.id, err);
+      }
+    });
+    return Promise.resolve();
+  }
+
   function boot() {
     if (!window.__bhchat_webpack_hook__) {
       console.error('[BetterHeyboxChat] webpack hook missing — check patch order');
@@ -66,6 +109,9 @@
                 );
               }),
             );
+          })
+          .then(function () {
+            return loadUserPlugins();
           })
           .catch(function (err) {
             console.warn('[BetterHeyboxChat] plugin load skipped:', err);

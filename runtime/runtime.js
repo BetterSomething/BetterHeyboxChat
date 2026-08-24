@@ -153,6 +153,8 @@
       version: manifest.version || '0.0.0',
       author: manifest.author || prev.author || '',
       repository: manifest.repository || prev.repository || '',
+      desc: manifest.desc || prev.desc || '',
+      source: manifest.source || prev.source || 'bundled',
       entry: manifest.entry || 'index.js',
       minClientVersion: manifest.minClientVersion,
       enabledDefault: manifest.enabled !== false,
@@ -169,6 +171,8 @@
         version: plugin.version,
         author: plugin.author || '',
         repository: plugin.repository || '',
+        desc: plugin.desc || '',
+        source: plugin.source || 'bundled',
         entry: plugin.entry,
         minClientVersion: plugin.minClientVersion,
         enabled: isPluginEnabled(id),
@@ -228,6 +232,14 @@
       return window.electronAPI.restartApp();
     }
     return Promise.reject(new Error('electronAPI.restartApp 不可用'));
+  }
+
+  function callPluginStore(method, arg) {
+    var api = window.bhchatPreload && window.bhchatPreload.plugins;
+    if (!api || typeof api[method] !== 'function') {
+      return { ok: false, error: 'preload 插件接口不可用' };
+    }
+    return api[method](arg);
   }
 
   window.BHChat = {
@@ -292,6 +304,35 @@
     isPluginEnabled: isPluginEnabled,
     setPluginEnabled: setPluginEnabled,
     restart: restart,
+
+    plugins: {
+      dataRoot: function () {
+        return window.bhchatPreload && window.bhchatPreload.plugins
+          ? window.bhchatPreload.plugins.dataRoot()
+          : '';
+      },
+      inspectZipPath: function (p) {
+        return callPluginStore('inspectZipPath', p);
+      },
+      inspectZipBuffer: function (buf) {
+        return callPluginStore('inspectZipBuffer', buf);
+      },
+      inspectFolderPath: function (p) {
+        return callPluginStore('inspectFolderPath', p);
+      },
+      installZipPath: function (p) {
+        return callPluginStore('installZipPath', p);
+      },
+      installZipBuffer: function (buf) {
+        return callPluginStore('installZipBuffer', buf);
+      },
+      installFolderPath: function (p) {
+        return callPluginStore('installFolderPath', p);
+      },
+      uninstall: function (id) {
+        return callPluginStore('uninstall', id);
+      },
+    },
 
     electron: window.electronAPI,
     overlay: window.overlayAPI,

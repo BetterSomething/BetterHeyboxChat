@@ -44,6 +44,17 @@
     );
   }
 
+  function safeHttpUrl(value) {
+    if (!value || typeof value !== 'string') return '';
+    try {
+      var parsed = new URL(value);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.href;
+    } catch (err) {
+      return '';
+    }
+    return '';
+  }
+
   function buildSettingsComponent() {
     return {
       name: COMPONENT_NAME,
@@ -169,23 +180,33 @@
             if (pending) subParts.push('重启后生效');
             var subChildren = [h('span', subParts.join(' · '))];
             if (plugin.repository) {
+              var repoUrl = safeHttpUrl(plugin.repository);
+              if (repoUrl) {
               subChildren.push(
                 h(
                   'a',
                   {
                     class: 'bhchat-link',
-                    attrs: { href: plugin.repository, target: '_blank' },
+                    attrs: { href: repoUrl, target: '_blank' },
                     on: {
                       click: function (e) {
                         if (e && e.preventDefault) e.preventDefault();
                         if (e && e.stopPropagation) e.stopPropagation();
-                        window.open(plugin.repository, '_blank');
+                        window.open(repoUrl, '_blank');
                       },
                     },
                   },
                   '仓库',
                 ),
               );
+              }
+            }
+            var rowText = [
+              h('div', plugin.name),
+              h('div', { class: 'bhchat-row-sub' }, subChildren),
+            ];
+            if (plugin.desc) {
+              rowText.push(h('div', { class: 'bhchat-row-desc' }, plugin.desc));
             }
             pluginRows.push(
               h(
@@ -199,10 +220,7 @@
                   },
                 },
                 [
-                  h('div', { class: 'bhchat-row-text' }, [
-                    h('div', plugin.name),
-                    h('div', { class: 'bhchat-row-sub' }, subChildren),
-                  ]),
+                  h('div', { class: 'bhchat-row-text' }, rowText),
                   hSwitch(h, plugin.enabled),
                 ],
               ),
@@ -283,6 +301,7 @@
       '.betterheyboxchat-setting-block .bhchat-row-click:hover{filter:brightness(1.08)}',
       '.betterheyboxchat-setting-block .bhchat-row-text{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;flex:1;padding-right:12px}',
       '.betterheyboxchat-setting-block .bhchat-row-sub{font-size:12px;line-height:16px;color:var(--text-3,#8b8e93);display:flex;align-items:center;flex-wrap:wrap;gap:6px}',
+      '.betterheyboxchat-setting-block .bhchat-row-desc{font-size:12px;line-height:18px;color:var(--text-3,#8b8e93);white-space:pre-wrap;word-break:break-word}',
       '.betterheyboxchat-setting-block .bhchat-row-value{color:var(--text-3,#8b8e93);font-size:13px}',
       '.betterheyboxchat-setting-block .bhchat-link{color:var(--brand-text,#7dd95e);text-decoration:none;cursor:pointer}',
       '.betterheyboxchat-setting-block .bhchat-link:hover{text-decoration:underline}',

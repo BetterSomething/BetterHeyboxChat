@@ -1,0 +1,11 @@
+{
+  "id": "marketplace",
+  "name": "插件市场",
+  "version": "1.0.0",
+  "author": "AwCat",
+  "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+  "desc": "BHC 内置插件市场 请勿删除 可能会导致未预料的问题",
+  "minClientVersion": "1.56.0",
+  "enabled": true,
+  "entry": "index.js"
+}
