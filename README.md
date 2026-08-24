@@ -15,7 +15,7 @@
 
 #### 普通用户
 
-去仓库的 [Releases](https://github.com/BetterSomething/BetterHeyboxChat/releases/new) 里面下载`bhchat-installer.exe`并运行
+去仓库的 [Releases](https://github.com/BetterSomething/BetterHeyboxChat/releases/) 里面下载`bhchat-installer.exe`并运行
 
 #### 开发者
 
