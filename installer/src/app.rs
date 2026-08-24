@@ -6,6 +6,7 @@ use crate::patch::{
     uninstall_patches_managed,
 };
 use crate::types::{ClientInstall, PatchState};
+use crate::userdata;
 use eframe::egui;
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -25,12 +26,12 @@ pub struct InstallerApp {
     pub(crate) status_text: String,
     pub(crate) progress: f32,
     pub(crate) busy: bool,
-    pub(crate) beta_channel: bool,
     pub(crate) show_manual_path: bool,
     pub(crate) manual_path_input: String,
     worker_rx: Option<Receiver<WorkerMsg>>,
     pub(crate) admin: bool,
     pub(crate) heybox_running: bool,
+    pub(crate) data_root_text: String,
     last_process_check: Instant,
 }
 
@@ -46,12 +47,12 @@ impl InstallerApp {
             status_text: String::new(),
             progress: 0.0,
             busy: false,
-            beta_channel: false,
             show_manual_path: false,
             manual_path_input: String::new(),
             worker_rx: None,
             admin: is_admin(),
             heybox_running: false,
+            data_root_text: String::new(),
             last_process_check: Instant::now() - Duration::from_secs(2),
         };
         app.refresh_process_status();
@@ -75,6 +76,8 @@ impl InstallerApp {
             .as_ref()
             .map(|i| read_patch_state(&i.app_dir))
             .unwrap_or_default();
+
+        self.data_root_text = userdata::current_data_root().display().to_string();
 
         if self.install.is_none() {
             self.status_text = "未找到黑盒语音安装，请尝试手动指定路径。".into();
@@ -224,15 +227,59 @@ impl InstallerApp {
         });
     }
 
+    pub(crate) fn pick_data_root(&mut self) {
+        if let Some(path) = rfd::FileDialog::new()
+            .set_title("选择 BetterHeyboxChat 数据目录")
+            .pick_folder()
+        {
+            match userdata::set_data_root(&path) {
+                Ok(root) => {
+                    self.data_root_text = root.display().to_string();
+                    self.status_text = format!(
+                        "数据目录已改为 {}。请重启黑盒语音使插件目录生效。",
+                        self.data_root_text
+                    );
+                }
+                Err(err) => {
+                    self.status_text = err;
+                }
+            }
+        }
+    }
+
+    pub(crate) fn reset_data_root(&mut self) {
+        match userdata::reset_data_root() {
+            Ok(root) => {
+                self.data_root_text = root.display().to_string();
+                self.status_text = format!(
+                    "已恢复默认数据目录 {}。旧目录中的插件文件不会删除。",
+                    self.data_root_text
+                );
+            }
+            Err(err) => {
+                self.status_text = err;
+            }
+        }
+    }
+
     pub(crate) fn pick_manual_path(&mut self) {
         if let Some(path) = rfd::FileDialog::new()
             .set_title("选择黑盒语音安装目录")
             .pick_folder()
         {
             self.manual_path_input = path.display().to_string();
-            self.manual_root = Some(path);
-            self.refresh_detection();
+            self.show_manual_path = true;
         }
+    }
+
+    pub(crate) fn apply_manual_path(&mut self) {
+        let trimmed = self.manual_path_input.trim();
+        if trimmed.is_empty() {
+            self.status_text = "请输入黑盒语音安装目录。".into();
+            return;
+        }
+        self.manual_root = Some(PathBuf::from(trimmed));
+        self.refresh_detection();
     }
 }
 

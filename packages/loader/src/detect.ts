@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import {
   DEFAULT_INSTALL_CANDIDATES,
   HEYBOX_DISPLAY_NAME_HINTS,
+  REGISTRY_APP_PATH_KEYS,
   REGISTRY_UNINSTALL_KEYS,
 } from './constants.js';
 import type { ClientInstall } from './types.js';
@@ -15,15 +16,49 @@ const execFileAsync = promisify(execFile);
 
 const SEMVER_DIR = /^\d+\.\d+\.\d+$/;
 
+export function stripIconIndex(value: string): string {
+  const trimmed = value.trim().replace(/^"|"$/g, '').trim();
+  const comma = trimmed.lastIndexOf(',');
+  if (comma >= 0 && /^[-\d]+$/.test(trimmed.slice(comma + 1))) {
+    return trimmed.slice(0, comma).trim().replace(/^"|"$/g, '');
+  }
+  return trimmed;
+}
+
+export function collectCandidateRoots(opts: {
+  manualRoot?: string;
+  registryRoots?: string[];
+  fallbacks?: string[];
+}): string[] {
+  const roots = opts.manualRoot
+    ? [opts.manualRoot]
+    : [...(opts.registryRoots ?? []), ...(opts.fallbacks ?? [])];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const root of roots) {
+    const key = root.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(root);
+    }
+  }
+  return out;
+}
+
 export async function detectInstall(installRoot?: string): Promise<ClientInstall | null> {
   const roots = installRoot
-    ? [installRoot]
-    : [...DEFAULT_INSTALL_CANDIDATES, ...(await findRegistryInstallRoots())];
+    ? collectCandidateRoots({ manualRoot: installRoot })
+    : collectCandidateRoots({
+        registryRoots: await findRegistryInstallRoots(),
+        fallbacks: DEFAULT_INSTALL_CANDIDATES,
+      });
 
-  const uniqueRoots = [...new Set(roots.map(normalizePath))];
-
-  for (const root of uniqueRoots) {
-    const install = await resolveInstallFromRoot(root);
+  const seen = new Set<string>();
+  for (const root of roots) {
+    const inferred = await inferInstallRoot(root);
+    if (!inferred || seen.has(inferred)) continue;
+    seen.add(inferred);
+    const install = await resolveInstallFromRoot(inferred);
     if (install) return install;
   }
 
@@ -34,7 +69,21 @@ async function findRegistryInstallRoots(): Promise<string[]> {
   if (process.platform !== 'win32') return [];
 
   const roots: string[] = [];
+  await collectAppPathRoots(roots);
+  await collectUninstallRoots(roots);
+  return roots;
+}
 
+async function collectAppPathRoots(roots: string[]): Promise<void> {
+  for (const key of REGISTRY_APP_PATH_KEYS) {
+    const values = await readRegValues(key);
+    if (!values) continue;
+    await pushInferredRoot(roots, values.defaultValue);
+    await pushInferredRoot(roots, values.path);
+  }
+}
+
+async function collectUninstallRoots(roots: string[]): Promise<void> {
   for (const key of REGISTRY_UNINSTALL_KEYS) {
     let subKeys: string[] = [];
     try {
@@ -54,19 +103,43 @@ async function findRegistryInstallRoots(): Promise<string[]> {
     for (const subKey of subKeys) {
       const info = await readUninstallKey(subKey);
       if (!info) continue;
-      if (matchesHeyboxName(info.displayName) && info.installLocation) {
-        roots.push(info.installLocation);
-        return roots;
+      if (!matchesHeyboxName(info.displayName) || looksLikeAccelerator(info.displayName)) {
+        continue;
       }
+      await pushInferredRoot(roots, info.installLocation);
+      await pushInferredRoot(roots, info.displayIcon);
     }
   }
+}
 
-  return roots;
+async function readRegValues(
+  key: string,
+): Promise<{ defaultValue?: string; path?: string } | null> {
+  try {
+    const { stdout } = await execFileAsync('reg', ['query', key], {
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+    let defaultValue: string | undefined;
+    let pathValue: string | undefined;
+    for (const line of stdout.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (/^\(Default\)/i.test(trimmed) || /^\(默认\)/.test(trimmed)) {
+        defaultValue = trimmed.split(/REG_SZ/i).pop()?.trim();
+      }
+      if (/^Path\s/i.test(trimmed)) {
+        pathValue = trimmed.split(/REG_SZ/i).pop()?.trim();
+      }
+    }
+    return { defaultValue, path: pathValue };
+  } catch {
+    return null;
+  }
 }
 
 async function readUninstallKey(
   subKey: string,
-): Promise<{ displayName?: string; installLocation?: string } | null> {
+): Promise<{ displayName?: string; installLocation?: string; displayIcon?: string } | null> {
   try {
     const { stdout } = await execFileAsync('reg', ['query', subKey], {
       encoding: 'utf8',
@@ -75,6 +148,7 @@ async function readUninstallKey(
 
     let displayName: string | undefined;
     let installLocation: string | undefined;
+    let displayIcon: string | undefined;
 
     for (const line of stdout.split(/\r?\n/)) {
       const trimmed = line.trim();
@@ -84,10 +158,13 @@ async function readUninstallKey(
       if (trimmed.startsWith('InstallLocation')) {
         installLocation = trimmed.split('REG_SZ').pop()?.trim();
       }
+      if (trimmed.startsWith('DisplayIcon')) {
+        displayIcon = trimmed.split('REG_SZ').pop()?.trim();
+      }
     }
 
-    if (!displayName && !installLocation) return null;
-    return { displayName, installLocation };
+    if (!displayName && !installLocation && !displayIcon) return null;
+    return { displayName, installLocation, displayIcon };
   } catch {
     return null;
   }
@@ -97,6 +174,41 @@ function matchesHeyboxName(name?: string): boolean {
   if (!name) return false;
   const lower = name.toLowerCase();
   return HEYBOX_DISPLAY_NAME_HINTS.some((hint) => lower.includes(hint.toLowerCase()));
+}
+
+function looksLikeAccelerator(name?: string): boolean {
+  if (!name) return false;
+  const lower = name.toLowerCase();
+  return lower.includes('加速') || lower.includes('accelerator') || lower.includes('heyboxacc');
+}
+
+async function pushInferredRoot(roots: string[], raw?: string): Promise<void> {
+  if (!raw) return;
+  const inferred = await inferInstallRoot(stripIconIndex(raw));
+  if (inferred && !roots.includes(inferred)) {
+    roots.push(inferred);
+  }
+}
+
+async function inferInstallRoot(start: string): Promise<string | null> {
+  let current = start;
+  try {
+    if (fs.existsSync(current) && fs.statSync(current).isFile()) {
+      current = path.dirname(current);
+    }
+  } catch {
+    return null;
+  }
+
+  for (let i = 0; i < 8; i += 1) {
+    if (await resolveInstallFromRoot(current)) {
+      return normalizePath(current);
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return null;
 }
 
 async function resolveInstallFromRoot(installRoot: string): Promise<ClientInstall | null> {

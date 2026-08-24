@@ -175,6 +175,8 @@ const demo = listed.find((p) => p.id === 'demo');
 assert(demo && demo.enabled === false, 'listPlugins 应反映用户禁用状态');
 assert(demo.author === 'AwCat', 'listPlugins 应带上 author');
 assert(demo.repository === 'https://github.com/BetterSomething/BetterHeyboxChat', 'listPlugins 应带上 repository');
+assert(demo.source === 'bundled', '未标 source 的插件应视为 bundled');
+assert(typeof demo.desc === 'string', 'listPlugins 应带上 desc');
 
 const pluginsJson = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../../../runtime/plugins.json'), 'utf8'),
@@ -182,6 +184,14 @@ const pluginsJson = JSON.parse(
 assert(
   pluginsJson.every((p) => p.author && p.repository),
   'plugins.json 每项应有 author 与 repository',
+);
+assert(
+  pluginsJson.every((p) => typeof p.desc === 'string' && p.desc.length > 0 && p.desc.length <= 100),
+  'plugins.json 每项应有不超过 100 字的 desc',
+);
+assert(
+  pluginsJson.some((p) => p.id === 'marketplace' && p.entry === 'index.js'),
+  'plugins.json 应注册 marketplace',
 );
 
 const ns = BHChat.storage.ns('demo');
@@ -234,11 +244,150 @@ assert(
   'plugins.json 应注册 channel-tts',
 );
 
+const laughterSource = fs.readFileSync(
+  path.resolve(__dirname, '../../../runtime/plugins/laughter-fav-fix/index.js'),
+  'utf8',
+);
+assert(/registerPanel/.test(laughterSource), '语音包收藏修复设置应通过 registerPanel 挂到设置页');
+assert(/bhchat-switch/.test(laughterSource) && /bhchat-btn-primary/.test(laughterSource), '语音包收藏修复应使用开关与主按钮');
+assert(!/pointer-keyset/.test(laughterSource), '语音包收藏修复不应再用 pointer-keyset 充当按钮');
+assert(/dispatch|subscribe|\$emit/.test(laughterSource), '语音包收藏修复应挂接 Vuex / EventBus 以刷新列表');
+assert(!/'30570'|\"30570\"/.test(laughterSource), '语音包收藏修复不应写死 EventBus 模块 ID');
+assert(
+  /Refresh_User_Laughter/.test(laughterSource),
+  '语音包收藏修复应触发官方 Refresh_User_Laughter（与语音包平台收藏相同）',
+);
+assert(
+  /SET_FAVORITE_VOICE_PACK_IDS/.test(laughterSource),
+  '语音包收藏修复应监听 SET_FAVORITE_VOICE_PACK_IDS（频道内收藏/取消收藏只改了这个 mutation）',
+);
+assert(/取消收藏/.test(laughterSource), '语音包收藏修复应覆盖取消收藏路径');
+assert(/bhchat-hint/.test(laughterSource), '语音包收藏修复设置页应展示刷新结果反馈');
+
+const danmakuSource = fs.readFileSync(
+  path.resolve(__dirname, '../../../runtime/plugins/screen-share-danmaku/index.js'),
+  'utf8',
+);
+assert(/registerPanel/.test(danmakuSource), '屏幕共享增强设置应通过 registerPanel 挂到设置页');
+assert(/bhchat-switch/.test(danmakuSource), '屏幕共享增强应使用开关');
+assert(!/pointer-keyset/.test(danmakuSource), '屏幕共享增强不应再用 pointer-keyset 充当按钮');
+assert(/SOCKET_SEND_MESSAGE/.test(danmakuSource) && /SOCKET_USER_IM_MESSAGE/.test(danmakuSource), '屏幕共享弹幕应订阅官方文字消息事件');
+assert(/bhchat-ss-danmaku-layer|LAYER_ID/.test(danmakuSource), '屏幕共享增强应在共享画面上叠加弹幕层');
+assert(!/'30570'|\"30570\"/.test(danmakuSource), '屏幕共享增强不应写死 EventBus 模块 ID');
+assert(
+  /screen_sharing_info/.test(danmakuSource),
+  '弹幕开关应读官方 Vuex screen_sharing_info（观众是否在看共享，ScreenShareOccupy.isWatching 同源）',
+);
+assert(
+  /my_screen_sharing/.test(danmakuSource),
+  '弹幕开关应读官方 Vuex my_screen_sharing（自己是否在共享）',
+);
+assert(
+  /screen_share_cpt_height/.test(danmakuSource),
+  '弹幕开关应读官方 Vuex screen_share_cpt_height（观看区占位高度，未观看时为 0）',
+);
+assert(
+  /cpt-screen-share-occupy/.test(danmakuSource),
+  '弹幕层应挂到观众端官方占位节点 cpt-screen-share-occupy（TRTC 画面填进该节点）',
+);
+assert(
+  /cpt-screenshare-me-preview/.test(danmakuSource),
+  '分享者侧应识别官方预览节点 cpt-screenshare-me-preview（可能被暂停预览）',
+);
+assert(
+  /querySelectorAll/.test(danmakuSource),
+  '共享画面宿主应遍历全部候选节点并取最大块，避免 querySelector 命中配置弹窗缩略图后整段选择器被跳过',
+);
+assert(
+  /attributeFilter/.test(danmakuSource),
+  '应观察 occupy 的 style/class，否则只改高度时 MutationObserver(childList) 不会触发',
+);
+assert(
+  /screen-share-operate/.test(danmakuSource),
+  '弹幕输入框应挂到官方屏幕共享控制栏 .screen-share-operate，而不是 occupy 底边另起一条',
+);
+assert(
+  !/#['"] \+\s*LAYER_ID[\s\S]*bhchat-ss-form\{position:absolute/.test(danmakuSource) &&
+    !/bhchat-ss-form\{position:absolute;left:50%;bottom:18px/.test(danmakuSource),
+  '弹幕输入框不应再绝对定位在共享画面底部凸出',
+);
+assert(
+  /requestPictureInPicture/.test(danmakuSource),
+  '应钩住官方 video.requestPictureInPicture（客户端 enablePictureInPicture 走这条）',
+);
+assert(
+  /documentPictureInPicture/.test(danmakuSource),
+  '非 Electron 环境可走 Document PiP，在 PiP 窗口里叠弹幕层',
+);
+assert(
+  /captureStream/.test(danmakuSource),
+  'Electron 原生 Video PiP 画不了 HTML，应把弹幕合成进 canvas 流再进画中画',
+);
+assert(
+  /pictureInPictureElement/.test(danmakuSource),
+  '应兼容官方 diasblePictureInPicture 对 document.pictureInPictureElement 的检查',
+);
+
+assert(
+  pluginsManifest.some((p) => p.id === 'laughter-fav-fix' && p.entry === 'index.js'),
+  'plugins.json 应注册 laughter-fav-fix',
+);
+assert(
+  pluginsManifest.some((p) => p.id === 'screen-share-danmaku' && p.entry === 'index.js'),
+  'plugins.json 应注册 screen-share-danmaku',
+);
+
 const hookSource = fs.readFileSync(path.resolve(__dirname, '../../../runtime/webpack-hook.js'), 'utf8');
 assert(/listPanels|registerPanel/.test(hookSource), '设置页应渲染已注册 panel');
 assert(/立即重启|restart\(/.test(hookSource), '设置页应提供立即重启按钮');
 assert(/bhchat-btn-primary/.test(hookSource) && /bhchat-switch/.test(hookSource), '设置页应区分主按钮与开关样式');
 assert(!/pointer-keyset/.test(hookSource), '设置页不应再用 pointer-keyset 把按钮做成列表行');
+assert(/bhchat-row-desc/.test(hookSource), '设置页插件行应展示 desc');
+assert(/safeHttpUrl/.test(hookSource), '仓库链接应经过 http(s) 校验');
+
+const marketplaceSource = fs.readFileSync(
+  path.resolve(__dirname, '../../../runtime/plugins/marketplace/index.js'),
+  'utf8',
+);
+assert(/registerPanel/.test(marketplaceSource), '插件市场应挂到设置页');
+assert(/webkitdirectory/.test(marketplaceSource), '插件市场应支持选择文件夹');
+assert(/dragover|drop/.test(marketplaceSource), '插件市场应支持拖放安装');
+assert(/确认安装/.test(marketplaceSource), '安装前应二次确认');
+assert(!/innerHTML|v-html|domProps/.test(marketplaceSource), '确认框不得把插件字段当 HTML 插入');
+
+const loaderSource2 = fs.readFileSync(path.resolve(__dirname, '../../../runtime/loader.js'), 'utf8');
+assert(/loadUserPlugins/.test(loaderSource2), 'loader 应加载用户目录插件');
+assert(/injectTextScript/.test(loaderSource2), '用户插件应通过文本注入而不是 file://');
+
+const installerUi = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/ui.rs'), 'utf8');
+const installerApp = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/app.rs'), 'utf8');
+const installerMain = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/main.rs'), 'utf8');
+const installerDetect = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/detect.rs'), 'utf8');
+assert(!/测试通道/.test(installerUi) && !/beta_channel/.test(installerUi) && !/beta_channel/.test(installerApp), '安装器应删除测试通道开关');
+assert(/确定/.test(installerUi), '指定路径输入后应有确定按钮');
+assert(
+  /show_manual_path[\s\S]*浏览/.test(installerUi) || /浏览[\s\S]*show_manual_path/.test(installerUi),
+  '浏览按钮应放在路径输入框旁边，而不是按钮网格里单独一格',
+);
+assert(/apply_manual_path/.test(installerApp) && /apply_manual_path/.test(installerUi), '确定按钮应调用 apply_manual_path');
+assert(/ScrollArea/.test(installerUi), '安装器内容超出窗口时应可纵向滚动');
+assert(
+  /DisplayIcon|display_icon/.test(installerDetect),
+  '注册表 InstallLocation 为空时应回退 DisplayIcon（本机 HeyboxChat 卸载项就是这样）',
+);
+assert(
+  /collect_candidate_roots/.test(installerDetect),
+  '探测根目录收集应独立成 collect_candidate_roots，保证注册表优先于硬编码路径',
+);
+const installerToml = fs.readFileSync(path.resolve(__dirname, '../../../installer/Cargo.toml'), 'utf8');
+assert(
+  /features\s*=\s*\[[^\]]*["']wgpu["']/.test(installerToml),
+  '安装器应启用 eframe wgpu（Windows 走 DX11/12），避免 egui_glow 因 OpenGL 2.0 不可用而启动失败',
+);
+assert(
+  /Renderer::Wgpu/.test(installerMain),
+  '安装器启动应显式选择 wgpu 渲染后端',
+);
 
 console.log('OK: BHChat Phase 2 API / 插件启停 / watch / panel');
 process.exit(0);

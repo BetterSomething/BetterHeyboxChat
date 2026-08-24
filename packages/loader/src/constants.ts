@@ -34,4 +34,10 @@ export const REGISTRY_UNINSTALL_KEYS = [
   'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
 ];
 
+export const REGISTRY_APP_PATH_KEYS = [
+  'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\HeyboxChat.exe',
+  'HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\App Paths\\HeyboxChat.exe',
+  'HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\HeyboxChat.exe',
+];
+
 export const HEYBOX_DISPLAY_NAME_HINTS = ['heybox', '黑盒语音', '黑盒', 'heybox chat'];

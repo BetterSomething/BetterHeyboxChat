@@ -3,29 +3,20 @@ use crate::path_util::normalize_path;
 use crate::types::{ClientInstall, PackageJson};
 use std::fs;
 use std::path::{Path, PathBuf};
-pub fn detect_install(manual_root: Option<&Path>) -> Option<ClientInstall> {
-    let mut roots: Vec<PathBuf> = Vec::new();
 
-    if let Some(root) = manual_root {
-        roots.push(root.to_path_buf());
-    } else {
-        roots.extend(
-            DEFAULT_INSTALL_CANDIDATES
-                .iter()
-                .map(|p| PathBuf::from(p)),
-        );
-        if let Some(registry_root) = find_registry_install_root() {
-            roots.push(registry_root);
-        }
-    }
+pub fn detect_install(manual_root: Option<&Path>) -> Option<ClientInstall> {
+    let registry_roots = find_registry_install_roots();
+    let roots = collect_candidate_roots(manual_root, &registry_roots, DEFAULT_INSTALL_CANDIDATES);
 
     let mut seen = std::collections::HashSet::new();
     for root in roots {
-        let normalized = normalize_path(&root);
-        if !seen.insert(normalized.clone()) {
+        let Some(install_root) = walk_to_install_root(&root) else {
+            continue;
+        };
+        if !seen.insert(install_root.clone()) {
             continue;
         }
-        if let Some(install) = resolve_install_from_root(&normalized) {
+        if let Some(install) = resolve_install_from_root(&install_root) {
             return Some(install);
         }
     }
@@ -33,8 +24,115 @@ pub fn detect_install(manual_root: Option<&Path>) -> Option<ClientInstall> {
     None
 }
 
+pub(crate) fn collect_candidate_roots(
+    manual_root: Option<&Path>,
+    registry_roots: &[PathBuf],
+    fallbacks: &[&str],
+) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    if let Some(root) = manual_root {
+        roots.push(root.to_path_buf());
+    } else {
+        roots.extend(registry_roots.iter().cloned());
+        roots.extend(fallbacks.iter().map(|p| PathBuf::from(*p)));
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for root in roots {
+        let key = root.to_string_lossy().to_lowercase();
+        if seen.insert(key) {
+            out.push(root);
+        }
+    }
+    out
+}
+
+pub(crate) fn strip_icon_index(value: &str) -> String {
+    let trimmed = value.trim().trim_matches('"').trim();
+    if let Some(i) = trimmed.rfind(',') {
+        let suffix = &trimmed[i + 1..];
+        if !suffix.is_empty() && suffix.chars().all(|c| c.is_ascii_digit() || c == '-') {
+            return trimmed[..i].trim().trim_matches('"').to_string();
+        }
+    }
+    trimmed.to_string()
+}
+
+pub(crate) fn looks_like_accelerator(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    lower.contains("加速") || lower.contains("accelerator") || lower.contains("heyboxacc")
+}
+
+pub(crate) fn walk_to_install_root(start: &Path) -> Option<PathBuf> {
+    let mut cur = if start.is_file() {
+        start.parent()?.to_path_buf()
+    } else {
+        start.to_path_buf()
+    };
+    for _ in 0..8 {
+        if resolve_install_from_root(&cur).is_some() {
+            return Some(normalize_path(&cur));
+        }
+        cur = cur.parent()?.to_path_buf();
+    }
+    None
+}
+
+fn push_inferred_root(roots: &mut Vec<PathBuf>, raw: &str) {
+    if raw.trim().is_empty() {
+        return;
+    }
+    let cleaned = strip_icon_index(raw);
+    if let Some(root) = walk_to_install_root(Path::new(&cleaned)) {
+        if !roots.iter().any(|existing| existing == &root) {
+            roots.push(root);
+        }
+    }
+}
+
 #[cfg(windows)]
-fn find_registry_install_root() -> Option<PathBuf> {
+fn find_registry_install_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    collect_app_path_roots(&mut roots);
+    collect_uninstall_roots(&mut roots);
+    roots
+}
+
+#[cfg(windows)]
+fn collect_app_path_roots(roots: &mut Vec<PathBuf>) {
+    use winreg::enums::*;
+    use winreg::RegKey;
+
+    let keys = [
+        (
+            HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\HeyboxChat.exe",
+        ),
+        (
+            HKEY_LOCAL_MACHINE,
+            r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\App Paths\HeyboxChat.exe",
+        ),
+        (
+            HKEY_CURRENT_USER,
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\HeyboxChat.exe",
+        ),
+    ];
+
+    for (hive, subkey) in keys {
+        let hk = RegKey::predef(hive);
+        let Ok(app_key) = hk.open_subkey(subkey) else {
+            continue;
+        };
+        let default_exe: String = app_key.get_value("").unwrap_or_default();
+        let path_dir: String = app_key.get_value("Path").unwrap_or_default();
+        push_inferred_root(roots, &default_exe);
+        push_inferred_root(roots, &path_dir);
+    }
+}
+
+#[cfg(windows)]
+fn collect_uninstall_roots(roots: &mut Vec<PathBuf>) {
     use winreg::enums::*;
     use winreg::RegKey;
 
@@ -58,20 +156,20 @@ fn find_registry_install_root() -> Option<PathBuf> {
                 continue;
             };
             let display_name: String = app_key.get_value("DisplayName").unwrap_or_default();
-            let install_location: String = app_key.get_value("InstallLocation").unwrap_or_default();
-
-            if matches_heybox_name(&display_name) && !install_location.is_empty() {
-                return Some(PathBuf::from(install_location));
+            if !matches_heybox_name(&display_name) || looks_like_accelerator(&display_name) {
+                continue;
             }
+            let install_location: String = app_key.get_value("InstallLocation").unwrap_or_default();
+            let display_icon: String = app_key.get_value("DisplayIcon").unwrap_or_default();
+            push_inferred_root(roots, &install_location);
+            push_inferred_root(roots, &display_icon);
         }
     }
-
-    None
 }
 
 #[cfg(not(windows))]
-fn find_registry_install_root() -> Option<PathBuf> {
-    None
+fn find_registry_install_roots() -> Vec<PathBuf> {
+    Vec::new()
 }
 
 fn matches_heybox_name(name: &str) -> bool {
@@ -158,6 +256,71 @@ fn compare_semver(a: &str, b: &str) -> std::cmp::Ordering {
         }
     }
     std::cmp::Ordering::Equal
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn strip_icon_index_removes_quoted_suffix() {
+        assert_eq!(
+            strip_icon_index(r#"D:\Program Files\Qingfeng\HeyboxChat\HeyboxChat.exe"#),
+            r#"D:\Program Files\Qingfeng\HeyboxChat\HeyboxChat.exe"#
+        );
+        assert_eq!(
+            strip_icon_index(r#""D:\Program Files\Qingfeng\HeyboxChat\HeyboxChat.exe",0"#),
+            r#"D:\Program Files\Qingfeng\HeyboxChat\HeyboxChat.exe"#
+        );
+    }
+
+    #[test]
+    fn collect_roots_puts_registry_before_hardcoded() {
+        let roots = collect_candidate_roots(
+            None,
+            &[PathBuf::from(r"D:\Program Files\Qingfeng\HeyboxChat")],
+            &[
+                r"C:\Program Files\Qingfeng\HeyboxChat",
+                r"D:\Program Files\Qingfeng\HeyboxChat",
+            ],
+        );
+        assert_eq!(roots[0], PathBuf::from(r"D:\Program Files\Qingfeng\HeyboxChat"));
+        assert_eq!(roots.len(), 2);
+    }
+
+    #[test]
+    fn collect_roots_manual_wins() {
+        let roots = collect_candidate_roots(
+            Some(Path::new(r"E:\Games\HeyboxChat")),
+            &[PathBuf::from(r"D:\Program Files\Qingfeng\HeyboxChat")],
+            &[r"C:\Program Files\Qingfeng\HeyboxChat"],
+        );
+        assert_eq!(roots, vec![PathBuf::from(r"E:\Games\HeyboxChat")]);
+    }
+
+    #[test]
+    fn walk_to_install_root_from_launcher_exe() {
+        let tmp = std::env::temp_dir().join(format!("bhchat-detect-{}", std::process::id()));
+        let version = tmp.join("1.0.0");
+        let app = version.join("resources").join("versions").join("1.0.0").join("app");
+        fs::create_dir_all(&app).unwrap();
+        let mut pkg = fs::File::create(app.join("package.json")).unwrap();
+        pkg.write_all(br#"{"name":"heybox-chat-electron","version":"1.0.0"}"#)
+            .unwrap();
+        let exe = tmp.join("HeyboxChat.exe");
+        fs::write(&exe, []).unwrap();
+
+        let found = walk_to_install_root(&exe).expect("should infer install root from launcher exe");
+        assert_eq!(found, normalize_path(&tmp));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn looks_like_accelerator_skips_heyboxacc() {
+        assert!(looks_like_accelerator("黑盒加速器 1.1.84"));
+        assert!(!looks_like_accelerator("黑盒语音 1.56.0"));
+    }
 }
 
 pub fn format_client_version(install: &ClientInstall) -> String {

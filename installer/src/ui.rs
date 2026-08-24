@@ -52,6 +52,16 @@ pub fn render(app: &mut InstallerApp, ctx: &egui::Context) {
                 .inner_margin(Margin::same(20)),
         )
         .show(ctx, |ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    ui.set_min_width(ui.available_width());
+                    render_content(app, ui, ctx);
+                });
+        });
+}
+
+fn render_content(app: &mut InstallerApp, ui: &mut egui::Ui, ctx: &egui::Context) {
             ui.label(RichText::new("BetterHeyboxChat").size(20.0).color(FG).strong());
             ui.add_space(2.0);
             ui.label(
@@ -76,11 +86,6 @@ pub fn render(app: &mut InstallerApp, ctx: &egui::Context) {
                 });
             });
 
-            ui.checkbox(
-                &mut app.beta_channel,
-                RichText::new("测试通道").size(13.0).color(MUTED),
-            );
-
             ui.add_space(8.0);
             hairline(ui);
             ui.add_space(12.0);
@@ -98,15 +103,21 @@ pub fn render(app: &mut InstallerApp, ctx: &egui::Context) {
                 }
             });
             ui.horizontal(|ui| {
-                let w = ((ui.available_width() - 16.0) / 3.0).max(96.0);
+                let w = ((ui.available_width() - 8.0) / 2.0).max(120.0);
                 if ghost_btn(ui, "刷新检测", !app.busy, w) {
                     app.refresh_detection();
                 }
                 if ghost_btn(ui, "指定路径", !app.busy, w) {
                     app.show_manual_path = !app.show_manual_path;
                 }
-                if ghost_btn(ui, "浏览", !app.busy, w) {
-                    app.pick_manual_path();
+            });
+            ui.horizontal(|ui| {
+                let w = ((ui.available_width() - 8.0) / 2.0).max(120.0);
+                if ghost_btn(ui, "修改数据地址", !app.busy, w) {
+                    app.pick_data_root();
+                }
+                if ghost_btn(ui, "重置数据地址", !app.busy, w) {
+                    app.reset_data_root();
                 }
             });
 
@@ -114,16 +125,20 @@ pub fn render(app: &mut InstallerApp, ctx: &egui::Context) {
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("路径").size(12.0).color(MUTED));
+                    let input_width = (ui.available_width() - 148.0).max(120.0);
                     let response = ui.add(
                         egui::TextEdit::singleline(&mut app.manual_path_input)
-                            .desired_width(ui.available_width())
+                            .desired_width(input_width)
                             .hint_text("黑盒语音安装目录"),
                     );
+                    if ghost_btn(ui, "浏览", !app.busy, 64.0) {
+                        app.pick_manual_path();
+                    }
+                    if outline_btn(ui, "确定", !app.busy, 64.0) {
+                        app.apply_manual_path();
+                    }
                     if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        if !app.manual_path_input.is_empty() {
-                            app.manual_root = Some(app.manual_path_input.clone().into());
-                            app.refresh_detection();
-                        }
+                        app.apply_manual_path();
                     }
                 });
             }
@@ -143,10 +158,12 @@ pub fn render(app: &mut InstallerApp, ctx: &egui::Context) {
             };
             ui.label(RichText::new(status).size(13.0).color(FG));
 
+            ui.add_space(14.0);
+            hairline(ui);
+            ui.add_space(10.0);
+            kv(ui, "数据目录", &app.data_root_text);
+
             if let Some(install) = &app.install {
-                ui.add_space(14.0);
-                hairline(ui);
-                ui.add_space(10.0);
                 kv(ui, "安装目录", &install.install_root.display().to_string());
                 kv(ui, "App 目录", &install.app_dir.display().to_string());
                 kv(
@@ -165,7 +182,6 @@ pub fn render(app: &mut InstallerApp, ctx: &egui::Context) {
                     kv(ui, "安装时间", at);
                 }
             }
-        });
 }
 
 fn kv(ui: &mut egui::Ui, key: &str, value: &str) {
