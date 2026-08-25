@@ -26,6 +26,7 @@ ehthumbs.db
 # Editor
 .idea/
 .vscode/
+.cursor/
 *.swp
 *~
 
