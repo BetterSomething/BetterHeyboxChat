@@ -203,6 +203,21 @@ assert((await BHChat.storage.get('bhchat.plugin.demo.theme')) === 'dark', '隔�
 BHChat.restart();
 assert(electronAPI.restarted === 1, 'restart() 应调用 electronAPI.restartApp');
 
+let updateSeen = null;
+BHChat.onClientUpdate(function (info) {
+  updateSeen = info;
+});
+assert(typeof BHChat.onClientUpdate === 'function', 'onClientUpdate 应注册回调');
+BHChat._notifyClientUpdate({ repaired: ['webapp/index.html'], intact: [], missing: [], envFixed: false });
+assert(updateSeen && updateSeen.repaired[0] === 'webapp/index.html', 'onClientUpdate 应收到补丁修复结果');
+let lateSeen = null;
+BHChat.onClientUpdate(function (info) {
+  lateSeen = info;
+});
+assert(lateSeen && lateSeen.repaired[0] === 'webapp/index.html', '晚注册的 onClientUpdate 应补发上次结果');
+assert(BHChat.patch && typeof BHChat.patch.getStatus === 'function', 'BHChat.patch.getStatus 应存在');
+assert(typeof BHChat.patch.ensure === 'function', 'BHChat.patch.ensure 应存在');
+
 const loaderSource = fs.readFileSync(path.resolve(__dirname, '../../../runtime/loader.js'), 'utf8');
 assert(
   /isPluginEnabled|enabledMap|plugin\.enabled/.test(loaderSource),
@@ -336,6 +351,28 @@ assert(
   pluginsManifest.some((p) => p.id === 'screen-share-danmaku' && p.entry === 'index.js'),
   'plugins.json 应注册 screen-share-danmaku',
 );
+assert(
+  pluginsManifest.some((p) => p.id === 'block-update' && p.entry === 'index.js'),
+  'plugins.json 应注册 block-update',
+);
+
+const blockSource = fs.readFileSync(
+  path.resolve(__dirname, '../../../runtime/plugins/block-update/index.js'),
+  'utf8',
+);
+assert(/registerPanel/.test(blockSource), '屏蔽更新设置应通过 registerPanel 挂到设置页');
+assert(/bhchat-switch/.test(blockSource), '屏蔽更新应使用开关');
+assert(/updateClient/.test(blockSource) && /updateAsarResource/.test(blockSource), '屏蔽更新应钩官方 electronAPI 更新方法');
+assert(/setAsarVersion/.test(blockSource), '屏蔽更新应拦截切换 asar 版本');
+assert(/updateBlock/.test(blockSource), '屏蔽更新应把开关写到 preload/main-bridge 可读的标记');
+assert(!/'30570'|\"30570\"/.test(blockSource), '屏蔽更新不应写死 EventBus 模块 ID');
+
+const mainBridgeSource = fs.readFileSync(
+  path.resolve(__dirname, '../../../runtime/main-bridge.js'),
+  'utf8',
+);
+assert(/ensurePatches/.test(mainBridgeSource), 'main-bridge 启动时应检查并补回 patch');
+assert(/wrapIpcMain/.test(mainBridgeSource), 'main-bridge 应拦截官方更新 IPC');
 
 const hookSource = fs.readFileSync(path.resolve(__dirname, '../../../runtime/webpack-hook.js'), 'utf8');
 assert(/listPanels|registerPanel/.test(hookSource), '设置页应渲染已注册 panel');
@@ -391,3 +428,4 @@ assert(
 
 console.log('OK: BHChat Phase 2 API / 插件启停 / watch / panel');
 process.exit(0);
+

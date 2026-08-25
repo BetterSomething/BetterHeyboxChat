@@ -182,4 +182,11 @@ BHChat.openSettings('betterheyboxchat');
 - 检测官方 Vuex `screen_sharing_info` / `my_screen_sharing` / `screen_share_cpt_height`；弹幕层挂 `.cpt-screen-share-occupy`；输入框挂官方 `.screen-share-operate`
 - 画中画时把弹幕合成进 PiP（Electron 走 canvas 流）；发送走官方发信通道，不伪造协议、不碰 RTC
 
+内置 `runtime/plugins/block-update/`：
+
+- 设置页开关分别屏蔽完整更新（`electronAPI.updateClient`）和热更新（`updateAsarResource` / `setAsarVersion`）
+- 开关写入 `betterheyboxchat/update-block.json`，由 main-bridge 在主进程拦截 IPC
+- 可调用 `BHChat.patch.ensure()` 立刻补回被热更新盖掉的 html / preload 注入
+
 复制 `custom-room-bg` 目录是最快的起步方式。
+

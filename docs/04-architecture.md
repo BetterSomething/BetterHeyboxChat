@@ -131,8 +131,8 @@ window.BHChat = {
 | 阶段 | 状态 |
 | --- | --- |
 | Phase 1 Loader（CLI + GUI、可还原、MVP 房间背景） | 已完成 |
-| Phase 2 BHChat API、Vuex watch、插件启停、开发文档 | 进行中（本轮 API / 启停 / 文档已落地） |
-| Phase 2 剩余：热更新后 patch 完整性校验 | 未做 |
+| Phase 2 BHChat API、Vuex watch、插件启停、开发文档 | 已完成 |
+| Phase 2 热更新后 patch 完整性校验 | 已落地（main-bridge `ensurePatches` + `BHChat.onClientUpdate`） |
 | Phase 3 社区模板、多版本映射 | 未开始 |
 
 ## 关键 Patch 点（1.56.0）
@@ -144,7 +144,7 @@ window.BHChat = {
 | 主进程入口 | `index.js` | 头部 require main-bridge |
 | 运行时 | `betterheyboxchat/` | 复制 `runtime/` |
 
-热更新可能覆盖 `webapp`。后续 Loader 应在启动时做完整性检测。
+热更新可能覆盖 `webapp`。`main-bridge` 在窗口加载前跑 `ensurePatches`，缺标记就补回 html / preload / index.js。内置插件 `block-update` 可拦截 `update-client`（完整更新）和 `updateAsarResource` / `setAsarVersion`（热更新）。
 
 ## 调试
 

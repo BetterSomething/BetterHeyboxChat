@@ -24,7 +24,20 @@
 
 ### `onClientUpdate(cb)`
 
-预留。热更新完整性校验尚未实现。
+启动时（以及手动 `BHChat.patch.ensure()` 后）收到补丁完整性结果。晚注册会补发上次结果。也可听 `BHChat.on('client-update', cb)`。
+
+```js
+BHChat.onClientUpdate(function (info) {
+  // info.repaired / intact / missing: 相对 app 根的路径
+  // info.envFixed: 是否把 ELECTRON_ENV 从 local 改回 prod
+});
+```
+
+热更新常只覆盖 `webapp/index.html`。真正的补回发生在 **main-bridge** 创建窗口之前，不依赖这个回调。
+
+### `BHChat.patch.getStatus()` / `BHChat.patch.ensure()`
+
+读/再跑一次完整性检查。`ensure` 会补回缺失的 html / preload / index.js 标记，并把 `env.js` 的 `local` 改回 `prod`。
 
 ## Vue / Vuex
 
@@ -77,6 +90,7 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 | 事件 | 载荷 | 何时 |
 | --- | --- | --- |
 | `ready` | 无 | 全部启用插件加载完 |
+| `client-update` | patch 状态对象 | 启动检查或手动 `patch.ensure` 之后 |
 | `panel-registered` | `panelId` | `registerPanel` 成功 |
 | `plugin-enabled-changed` | `{ id, enabled }` | `setPluginEnabled` 写入后（脚本仍按旧状态运行） |
 
@@ -217,6 +231,14 @@ BHChat.laughterFav.getSettings()
 BHChat.screenShareDanmaku.send(text)
 BHChat.screenShareDanmaku.getStatus()
 BHChat.screenShareDanmaku.getSettings()
+```
+
+`block-update` 启用后挂载：
+
+```javascript
+BHChat.blockUpdate.getSettings()
+BHChat.blockUpdate.getStatus()
+BHChat.blockUpdate.ensurePatch()
 ```
 
 第三方插件不要依赖这些名字，除非你明确依赖该插件。

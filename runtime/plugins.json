@@ -44,6 +44,17 @@
     "entry": "index.js"
   },
   {
+    "id": "block-update",
+    "name": "屏蔽客户端更新",
+    "version": "1.0.0",
+    "author": "AwCat",
+    "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+    "desc": "屏蔽完整客户端更新和热更新，并在启动时检查补丁是否被覆盖。",
+    "minClientVersion": "1.56.0",
+    "enabled": true,
+    "entry": "index.js"
+  },
+  {
     "id": "marketplace",
     "name": "插件市场",
     "version": "1.0.0",
