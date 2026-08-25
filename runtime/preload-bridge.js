@@ -87,6 +87,8 @@
   }
 
   var pluginStore = require('./lib/plugin-store.js');
+  var patchGuard = require('./lib/patch-guard.js');
+  var APP_DIR = path.join(__dirname, '..');
 
   window.bhchatPreload = {
     version: '0.1.0',
@@ -128,6 +130,22 @@
       readUserFile: function (id, rel) {
         var buf = pluginStore.readUserFile(id, rel);
         return buf ? buf.toString('utf8') : null;
+      },
+    },
+    patch: {
+      getStatus: function () {
+        return patchGuard.readStatus(__dirname);
+      },
+      ensure: function () {
+        return patchGuard.ensurePatches(APP_DIR);
+      },
+    },
+    updateBlock: {
+      get: function () {
+        return patchGuard.readBlockFlags(__dirname);
+      },
+      set: function (flags) {
+        return patchGuard.writeBlockFlags(__dirname, flags);
       },
     },
   };

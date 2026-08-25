@@ -9,8 +9,19 @@
 const Module = require('module');
 const fs = require('fs');
 const path = require('path');
+const patchGuard = require('./lib/patch-guard.js');
 
 const FLAG_PATH = path.join(__dirname, 'devtools.disabled');
+const APP_DIR = path.join(__dirname, '..');
+
+try {
+  const ensured = patchGuard.ensurePatches(APP_DIR);
+  if (ensured && ensured.repaired && ensured.repaired.length) {
+    console.log('[BetterHeyboxChat] repaired patches:', ensured.repaired.join(', '));
+  }
+} catch (err) {
+  console.warn('[BetterHeyboxChat] ensure patches failed:', err);
+}
 
 function isDevToolsEnabled() {
   try {
@@ -65,6 +76,16 @@ function patchElectron(mod) {
     attachExisting(mod);
   } else {
     mod.app.whenReady().then(() => attachExisting(mod));
+  }
+
+  if (mod.ipcMain) {
+    try {
+      patchGuard.wrapIpcMain(mod.ipcMain, function () {
+        return patchGuard.readBlockFlags(__dirname);
+      });
+    } catch (err) {
+      console.warn('[BetterHeyboxChat] wrap update ipc failed:', err);
+    }
   }
 
   if (mod.ipcMain && !mod.ipcMain.__bhchat_dt_ipc) {

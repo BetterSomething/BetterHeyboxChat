@@ -14,6 +14,8 @@
   var ENABLED_STORAGE_KEY = 'bhchat.plugins.enabled';
 
   var readyCallbacks = [];
+  var clientUpdateCallbacks = [];
+  var lastClientUpdate = null;
   var plugins = {};
   var panels = [];
   var eventBus = {};
@@ -194,9 +196,35 @@
     });
   }
 
+  function syncBlockFlagsIfDisabled() {
+    if (isPluginEnabled('block-update')) return;
+    if (window.bhchatPreload && window.bhchatPreload.updateBlock) {
+      window.bhchatPreload.updateBlock.set({ client: false, hotfix: false });
+    }
+  }
+
+  function notifyClientUpdate(info) {
+    lastClientUpdate = info || lastClientUpdate;
+    if (!lastClientUpdate) return lastClientUpdate;
+    clientUpdateCallbacks.forEach(function (cb) {
+      try {
+        cb(lastClientUpdate);
+      } catch (err) {
+        console.error('[BetterHeyboxChat] onClientUpdate error:', err);
+      }
+    });
+    if (window.BHChat && window.BHChat.emit) {
+      window.BHChat.emit('client-update', lastClientUpdate);
+    }
+    return lastClientUpdate;
+  }
+
   function setPluginEnabled(id, enabled) {
     enabledOverrides[id] = !!enabled;
     return persistEnabledMap().then(function () {
+      if (id === 'block-update' && !enabled) {
+        syncBlockFlagsIfDisabled();
+      }
       if (window.BHChat) {
         window.BHChat.emit('plugin-enabled-changed', { id: id, enabled: !!enabled });
       }
@@ -250,8 +278,31 @@
       if (typeof cb === 'function') readyCallbacks.push(cb);
     },
 
-    onClientUpdate: function () {
-      // 热更新完整性校验见后续任务
+    onClientUpdate: function (cb) {
+      if (typeof cb !== 'function') return;
+      clientUpdateCallbacks.push(cb);
+      if (lastClientUpdate) {
+        try {
+          cb(lastClientUpdate);
+        } catch (err) {
+          console.error('[BetterHeyboxChat] onClientUpdate error:', err);
+        }
+      }
+    },
+
+    patch: {
+      getStatus: function () {
+        if (window.bhchatPreload && window.bhchatPreload.patch) {
+          return window.bhchatPreload.patch.getStatus();
+        }
+        return lastClientUpdate;
+      },
+      ensure: function () {
+        if (window.bhchatPreload && window.bhchatPreload.patch) {
+          return notifyClientUpdate(window.bhchatPreload.patch.ensure());
+        }
+        return null;
+      },
     },
 
     getVue: getVue,
@@ -401,7 +452,13 @@
 
     _loadEnabledMap: loadEnabledMap,
 
+    _notifyClientUpdate: notifyClientUpdate,
+
     _ready: function () {
+      syncBlockFlagsIfDisabled();
+      if (window.bhchatPreload && window.bhchatPreload.patch) {
+        notifyClientUpdate(window.bhchatPreload.patch.getStatus());
+      }
       readyCallbacks.forEach(function (cb) {
         try {
           cb();
