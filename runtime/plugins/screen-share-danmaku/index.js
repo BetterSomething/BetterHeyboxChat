@@ -3,10 +3,11 @@
  * 消息来源与 channel-tts 相同：EventBus SOCKET_SEND_MESSAGE / SOCKET_USER_IM_MESSAGE。
  * 共享状态以客户端真实入口为准：
  * - 发起：语音频道左下角面板「屏幕共享」→ cpt-screen-share-config-dialog
- * - 观看：成员卡「观看共享」/ 双击用户 → Vuex screen_sharing_info + .cpt-screen-share-occupy
+ * - 观看：成员卡「观看共享」/ 双击用户 → 官方 isWatching = Boolean(screen_sharing_info.user_id) + .cpt-screen-share-occupy
  * - 输入框挂官方 .screen-share-operate（在 .mid-operate 前），不在 occupy 底边另起一条
  * - 画中画：钩 requestPictureInPicture；Electron 用 canvas.captureStream 合成弹幕，其它环境可走 Document PiP
  * - 自己在共享：Vuex my_screen_sharing；预览 .cpt-screenshare-me-preview（可能被暂停）
+ * - 弹幕只叠在 occupy / 自己的 preview 上，绝不挂到房间聊天主区
  * 不伪造服务端协议、不碰 TRTC/火山 RTC。
  */
 (function () {
@@ -364,18 +365,10 @@
     return mapState(['screen_sharing_info', 'my_screen_sharing', 'screen_share_cpt_height']);
   }
 
+  // 与官方 ScreenShareOccupy.isWatching / utils.hz 一致：只认 user_id。
+  // 默认值是 {}；停看时 SET_SCREEN_SHARING_INFO({})，不能把任意非空对象当成正在观看。
   function isSharingInfoActive(info) {
-    if (info == null || info === false || info === 0 || info === '') return false;
-    if (info === true || info === 1) return true;
-    if (typeof info !== 'object') return false;
-    if (Array.isArray(info)) return info.length > 0;
-    if (info.user_id != null && info.user_id !== '') return true;
-    if (info.userid != null && info.userid !== '') return true;
-    if (info.uid != null && info.uid !== '') return true;
-    if (info.userId != null && info.userId !== '') return true;
-    if (info.stream_id || info.streamId) return true;
-    if (info.sharing || info.is_sharing || info.is_watching) return true;
-    return Object.keys(info).length > 0;
+    return !!(info && info.user_id);
   }
 
   function pickLargest(nodeList, minW, minH) {
@@ -398,37 +391,34 @@
   }
 
   function findShareHost() {
-    var occupy = pickLargest(document.querySelectorAll('.cpt-screen-share-occupy'), 40, 40);
-    if (occupy) return occupy;
-    var block = pickLargest(document.querySelectorAll('.screen-block, [id^="screen-block-"]'), 80, 80);
-    if (block) {
-      var previewParent = block.closest ? block.closest('.cpt-screenshare-me-preview') : null;
-      if (previewParent && previewParent.offsetWidth >= 80 && previewParent.offsetHeight >= 80) {
-        return previewParent;
-      }
-      return block;
+    var snap = getShareSnapshot();
+    if (isSharingInfoActive(snap.screen_sharing_info)) {
+      var occupy = pickLargest(document.querySelectorAll('.cpt-screen-share-occupy'), 80, 80);
+      if (occupy) return occupy;
     }
-    var preview = pickLargest(document.querySelectorAll('.cpt-screenshare-me-preview'), 80, 80);
-    if (preview) return preview;
-    return (
-      document.querySelector('.view-room-inner-page') ||
-      document.querySelector('[class*="view-room-inner"]') ||
-      null
-    );
+    if (snap.my_screen_sharing) {
+      var preview = pickLargest(document.querySelectorAll('.cpt-screenshare-me-preview'), 80, 80);
+      if (preview) return preview;
+      var block = pickLargest(document.querySelectorAll('.screen-block, [id^="screen-block-"]'), 80, 80);
+      if (block) {
+        var previewParent = block.closest
+          ? block.closest('.cpt-screenshare-me-preview, .cpt-screen-share-occupy')
+          : null;
+        if (previewParent && previewParent.offsetWidth >= 80 && previewParent.offsetHeight >= 80) {
+          return previewParent;
+        }
+      }
+    }
+    return null;
+  }
+
+  function isPipSharing() {
+    return !!(pipCanvasActive || pipTrackEl || (pipWindow && !pipWindow.closed));
   }
 
   function isScreenSharing() {
-    var snap = getShareSnapshot();
-    if (snap.my_screen_sharing) return true;
-    if (isSharingInfoActive(snap.screen_sharing_info)) return true;
-    if (Number(snap.screen_share_cpt_height) > 40) return true;
-    return !!pickLargest(
-      document.querySelectorAll(
-        '.cpt-screen-share-occupy, .cpt-screenshare-me-preview, .screen-block, [id^="screen-block-"]',
-      ),
-      80,
-      80,
-    );
+    if (isPipSharing()) return true;
+    return !!findShareHost();
   }
 
   function injectStyles() {
@@ -842,7 +832,7 @@
 
   function spawnDanmaku(name, text) {
     if (!settings.overlay || !lastShare) return;
-    ensureLayer();
+    if (findShareHost()) ensureLayer();
     spawnOnTrack(trackEl, layerEl, name, text);
     if (pipTrackEl) spawnOnTrack(pipTrackEl, pipTrackEl, name, text);
     if (pipCanvasActive) pushPipItem(name, text);

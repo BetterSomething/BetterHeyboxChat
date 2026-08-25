@@ -179,7 +179,7 @@ BHChat.openSettings('betterheyboxchat');
 内置 `runtime/plugins/screen-share-danmaku/`：
 
 - 屏幕共享画面上以弹幕显示当前房间文字消息（同一套 `SOCKET_SEND_MESSAGE` / `SOCKET_USER_IM_MESSAGE`）
-- 检测官方 Vuex `screen_sharing_info` / `my_screen_sharing` / `screen_share_cpt_height`；弹幕层挂 `.cpt-screen-share-occupy`；输入框挂官方 `.screen-share-operate`
+- 观众端只在官方 `screen_sharing_info.user_id`（正在观看）且 occupy 可见时挂弹幕；自己共享挂 `.cpt-screenshare-me-preview`；不挂到房间聊天主区。输入框挂官方 `.screen-share-operate`
 - 画中画时把弹幕合成进 PiP（Electron 走 canvas 流）；发送走官方发信通道，不伪造协议、不碰 RTC
 
 内置 `runtime/plugins/block-update/`：

@@ -342,6 +342,23 @@ assert(
   /pictureInPictureElement/.test(danmakuSource),
   '应兼容官方 diasblePictureInPicture 对 document.pictureInPictureElement 的检查',
 );
+assert(
+  !/view-room-inner-page/.test(danmakuSource) && !/view-room-inner/.test(danmakuSource),
+  '弹幕宿主不能回退到房间聊天页 view-room-inner-page，否则未观看共享时弹幕会盖在主界面上',
+);
+assert(
+  !/return Object\.keys\(info\)\.length > 0/.test(danmakuSource),
+  '观看判定不能把任意非空 screen_sharing_info 当成正在看共享（官方 isWatching 只认 user_id）',
+);
+assert(
+  !/if \(Number\(snap\.screen_share_cpt_height\) > 40\) return true/.test(danmakuSource),
+  '不能单凭 screen_share_cpt_height>40 就开弹幕（进房/停看后高度可能残留，occupy 却不在）',
+);
+assert(
+  /info\.user_id/.test(danmakuSource),
+  '观众端是否在看共享应与官方 ScreenShareOccupy.isWatching 一致：Boolean(screen_sharing_info.user_id)',
+);
+
 
 assert(
   pluginsManifest.some((p) => p.id === 'laughter-fav-fix' && p.entry === 'index.js'),
