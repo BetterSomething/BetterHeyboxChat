@@ -1,0 +1,7 @@
+/* 官方房间背景层是 position:absolute 铺满 layout-content-wrapper，
+   客户端没写 pointer-events:none。有 bg_pic 时这层（含内部 ChatImg / filter:blur）
+   会盖住频道文字输入框，看起来像输入框卡住。 */
+.layout-bg-wrapper,
+.layout-bg-wrapper * {
+  pointer-events: none !important;
+}

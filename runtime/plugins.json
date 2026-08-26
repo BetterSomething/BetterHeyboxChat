@@ -55,6 +55,17 @@
     "entry": "index.js"
   },
   {
+    "id": "official-room-deco",
+    "name": "官方房间背景探测",
+    "version": "1.0.0",
+    "author": "AwCat",
+    "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+    "desc": "调用官方存量接口上传房间背景",
+    "minClientVersion": "1.56.0",
+    "enabled": true,
+    "entry": "index.js"
+  },
+  {
     "id": "marketplace",
     "name": "插件市场",
     "version": "1.0.0",

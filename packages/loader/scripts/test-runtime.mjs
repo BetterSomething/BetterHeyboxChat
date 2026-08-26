@@ -372,6 +372,19 @@ assert(
   pluginsManifest.some((p) => p.id === 'block-update' && p.entry === 'index.js'),
   'plugins.json 应注册 block-update',
 );
+assert(
+  pluginsManifest.some((p) => p.id === 'official-room-deco' && p.entry === 'index.js'),
+  'plugins.json 应注册 official-room-deco',
+);
+
+const officialDecoSource = fs.readFileSync(
+  path.resolve(__dirname, '../../../runtime/plugins/official-room-deco/index.js'),
+  'utf8',
+);
+assert(/registerPanel/.test(officialDecoSource), '官方背景探测应通过 registerPanel 挂到设置页');
+assert(/room_deco_pic/.test(officialDecoSource), '官方背景探测换图应走 room_deco_pic');
+assert(/26737/.test(officialDecoSource) && /\.DC\b/.test(officialDecoSource), '官方背景探测应调用 26737.DC');
+assert(!/canChangeBgPic\s*\(/.test(officialDecoSource), '官方背景探测不得调用 canChangeBgPic()');
 
 const blockSource = fs.readFileSync(
   path.resolve(__dirname, '../../../runtime/plugins/block-update/index.js'),

@@ -182,6 +182,12 @@ BHChat.openSettings('betterheyboxchat');
 - 观众端只在官方 `screen_sharing_info.user_id`（正在观看）且 occupy 可见时挂弹幕；自己共享挂 `.cpt-screenshare-me-preview`；不挂到房间聊天主区。输入框挂官方 `.screen-share-operate`
 - 画中画时把弹幕合成进 PiP（Electron 走 canvas 流）；发送走官方发信通道，不伪造协议、不碰 RTC
 
+内置 `runtime/plugins/official-room-deco/`：
+
+- 设置页探测官方全员房间背景写接口；忽略客户端 `can_change_bg_pic` / `room_decorate`
+- 换图走官方 `uploadCustomFile({ source: 'room_deco_pic' })`，保存走 webpack `26737.DC` → `POST /chatroom/v2/room/decorate`（仅 1.56.0）
+- 服务端仍可能拒绝；结果 JSON 打在设置页上
+
 内置 `runtime/plugins/block-update/`：
 
 - 设置页开关分别屏蔽完整更新（`electronAPI.updateClient`）和热更新（`updateAsarResource` / `setAsarVersion`）

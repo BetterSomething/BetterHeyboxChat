@@ -241,6 +241,15 @@ BHChat.blockUpdate.getStatus()
 BHChat.blockUpdate.ensurePatch()
 ```
 
+`official-room-deco` 启用后挂载（仅 1.56.0；走官方 `uploadCustomFile` + `POST /chatroom/v2/room/decorate`，忽略客户端 `can_change_bg_pic`）：
+
+```javascript
+BHChat.officialRoomDeco.snapshot()
+BHChat.officialRoomDeco.upload(file)
+BHChat.officialRoomDeco.decorate(patch?)
+BHChat.officialRoomDeco.applying()
+```
+
 第三方插件不要依赖这些名字，除非你明确依赖该插件。
 
 ## 错误与边界
