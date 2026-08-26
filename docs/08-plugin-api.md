@@ -165,7 +165,12 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 | `dataRoot()` | 当前用户数据根目录 |
 | `inspectZipPath(path)` / `inspectZipBuffer(buf)` / `inspectFolderPath(path)` | 解析包并返回洗白后的 manifest，不写盘 |
 | `installZipPath` / `installZipBuffer` / `installFolderPath` | 写入 `{dataRoot}/plugins/<id>/` |
-| `uninstall(id)` | 仅允许 `source=user` |
+| `uninstall(id)` | 仅允许用户插件 |
+| `fetchRegistry(mirror?)` | GET 货架 `registry.json`（Promise） |
+| `inspectRemote({ id, mirror, clientVersion })` | 按需下载插件目录，不写盘 |
+| `installRemote({ id, mirror, clientVersion })` | 确认后写入用户插件目录 |
+
+默认货架：`https://raw.githubusercontent.com/BetterSomething/BetterHeyboxChat-plugins/main/`。`mirror` 为可替换的 https 前缀。不在页面里执行远程脚本。
 
 inspect 结果供设置页确认框使用。`desc`/`name`/`author` 已去除 HTML 与控制字符。`repository` 只保留 http(s)。
 

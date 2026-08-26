@@ -133,6 +133,7 @@ window.BHChat = {
 | Phase 1 Loader（CLI + GUI、可还原、MVP 房间背景） | 已完成 |
 | Phase 2 BHChat API、Vuex watch、插件启停、开发文档 | 已完成 |
 | Phase 2 热更新后 patch 完整性校验 | 已落地（main-bridge `ensurePatches` + `BHChat.onClientUpdate`） |
+| Phase 3 在线货架（独立插件仓 `registry.json`） | 已落地（只拉清单，按需下载插件目录） |
 | Phase 3 社区模板、多版本映射 | 未开始 |
 
 ## 关键 Patch 点（1.56.0）

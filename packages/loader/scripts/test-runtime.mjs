@@ -421,6 +421,10 @@ assert(/webkitdirectory/.test(marketplaceSource), '插件市场应支持选择�
 assert(/dragover|drop/.test(marketplaceSource), '插件市场应支持拖放安装');
 assert(/确认安装/.test(marketplaceSource), '安装前应二次确认');
 assert(!/innerHTML|v-html|domProps/.test(marketplaceSource), '确认框不得把插件字段当 HTML 插入');
+assert(/fetchRegistry/.test(marketplaceSource), '插件市场应拉取在线 registry.json');
+assert(/inspectRemote/.test(marketplaceSource) && /installRemote/.test(marketplaceSource), '插件市场应按需下载远程插件目录');
+assert(/刷新货架/.test(marketplaceSource), '插件市场应能刷新在线货架');
+assert(/加速源/.test(marketplaceSource), '插件市场应允许配置加速源前缀');
 
 const loaderSource2 = fs.readFileSync(path.resolve(__dirname, '../../../runtime/loader.js'), 'utf8');
 assert(/loadUserPlugins/.test(loaderSource2), 'loader 应加载用户目录插件');

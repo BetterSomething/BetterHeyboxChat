@@ -383,6 +383,15 @@
       uninstall: function (id) {
         return callPluginStore('uninstall', id);
       },
+      fetchRegistry: function (mirror) {
+        return callPluginStore('fetchRegistry', mirror);
+      },
+      inspectRemote: function (opts) {
+        return callPluginStore('inspectRemote', opts);
+      },
+      installRemote: function (opts) {
+        return callPluginStore('installRemote', opts);
+      },
     },
 
     electron: window.electronAPI,

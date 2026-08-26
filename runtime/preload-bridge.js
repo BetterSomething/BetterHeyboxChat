@@ -127,6 +127,15 @@
       uninstall: function (id) {
         return pluginStore.uninstall(id);
       },
+      fetchRegistry: function (mirror) {
+        return pluginStore.fetchRegistry({ mirror: mirror });
+      },
+      inspectRemote: function (opts) {
+        return pluginStore.inspectRemote(opts || {});
+      },
+      installRemote: function (opts) {
+        return pluginStore.installRemote(opts || {});
+      },
       readUserFile: function (id, rel) {
         var buf = pluginStore.readUserFile(id, rel);
         return buf ? buf.toString('utf8') : null;

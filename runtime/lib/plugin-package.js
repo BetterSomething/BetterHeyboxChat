@@ -48,6 +48,18 @@ function isSafeRelPath(rel) {
   return true;
 }
 
+function parseManifestFiles(src) {
+  var out = [];
+  var raw = src && src.files;
+  if (!Array.isArray(raw)) return out;
+  for (var i = 0; i < raw.length; i++) {
+    var rel = normalizeRelPath(raw[i]);
+    if (!isSafeRelPath(rel)) continue;
+    if (out.indexOf(rel) === -1) out.push(rel);
+  }
+  return out;
+}
+
 function parseManifest(raw) {
   var src = raw;
   if (typeof raw === 'string') {
@@ -85,6 +97,7 @@ function parseManifest(raw) {
       enabled: src.enabled !== false,
       entry: entry,
       style: style || '',
+      files: parseManifestFiles(src),
     },
   };
 }

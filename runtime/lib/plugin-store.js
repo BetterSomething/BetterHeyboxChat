@@ -9,6 +9,7 @@ var os = require('os');
 var path = require('path');
 var pkg = require('./plugin-package.js');
 var zip = require('./zip-inflate.js');
+var registry = require('./plugin-registry.js');
 
 var PROFILE_ENV = 'BETTERHEYBOXCHAT_PROFILE';
 var APP_FOLDER = 'BetterHeyboxChat';
@@ -202,6 +203,25 @@ function uninstall(id) {
   return { ok: true, id: parsed.manifest.id };
 }
 
+function inspectRemote(opts) {
+  return registry.inspectRemote(opts).then(function (inspected) {
+    if (!inspected.ok) return inspected;
+    var preview = previewFromInspect(inspected, 'remote');
+    if (!preview.ok) return preview;
+    preview.files = inspected.files;
+    preview.prefix = inspected.prefix;
+    preview.root = inspected.root;
+    return preview;
+  });
+}
+
+function installRemote(opts) {
+  return inspectRemote(opts).then(function (preview) {
+    if (!preview.ok) return preview;
+    return writeInspected(preview);
+  });
+}
+
 function readUserFile(id, rel) {
   if (!pkg.isSafeRelPath(rel)) return null;
   var dest = path.join(pluginsRoot(), id, rel);
@@ -222,4 +242,7 @@ module.exports = {
   installFolderPath: installFolderPath,
   uninstall: uninstall,
   readUserFile: readUserFile,
+  fetchRegistry: registry.fetchRegistry,
+  inspectRemote: inspectRemote,
+  installRemote: installRemote,
 };

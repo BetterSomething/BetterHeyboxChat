@@ -44,7 +44,19 @@ runtime/plugins/my-plugin/
 
 `plugins.json` 里对应一项，字段保持一致。`id` 必须与目录名相同。`author`、`repository`、`desc` 会显示在设置页（仓库可点开）。`desc` 不超过 100 字，不要写 HTML。`enabled` 是默认值；用户可在设置里关掉，写入 `bhchat.plugins.enabled`，**重启后** loader 才跳过脚本。
 
-用户插件不要放进 `runtime/plugins/`。用设置页「插件市场」导入 zip 或文件夹，文件会写到安装器配置的数据目录（默认 `%APPDATA%\BetterHeyboxChat\plugins\<id>\`）。
+用户插件不要放进 `runtime/plugins/`。用设置页「插件市场」从在线货架安装，或导入本地 zip/文件夹。文件写到数据目录（默认 `%APPDATA%\BetterHeyboxChat\plugins\<id>\`）。第三方插件源码在独立仓 [BetterHeyboxChat-plugins](https://github.com/BetterSomething/BetterHeyboxChat-plugins)，发 PR 投稿。
+
+第三方插件发到独立仓，不要 PR 进框架仓：
+
+```
+BetterHeyboxChat-plugins/
+  registry.json          # 货架，客户端只拉这一份
+  your-plugin/
+    manifest.json
+    index.js
+```
+
+在 `registry.json` 的 `plugins` 数组加一行（id 与目录名相同），发 PR。客户端安装时再下载该目录的 `manifest.json`、`entry`、可选 `style` 与 `files`。
 
 ## 最小插件
 

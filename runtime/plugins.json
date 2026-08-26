@@ -71,7 +71,7 @@
     "version": "1.0.0",
     "author": "AwCat",
     "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
-    "desc": "从本地 zip 或文件夹安装第三方插件，安装前预览信息并确认。",
+    "desc": "从在线货架或本地 zip/文件夹安装第三方插件",
     "minClientVersion": "1.56.0",
     "enabled": true,
     "entry": "index.js"
