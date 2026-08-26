@@ -150,5 +150,5 @@ window.BHChat = {
 ## 调试
 
 - 安装后默认启用原生 DevTools：`F12` / `Ctrl+Shift+I`
-- 无需 DevTools：右下角 **BH** 角标 + 设置侧栏 BetterHeyboxChat
+- 无需 DevTools：右下角 **BHC vx.x.x** 角标 + 设置侧栏 BetterHeyboxChat（「显示角标」可关）
 - 改 `runtime/` 后用 **Debug 安装器重装**即可，不必 `cargo build`

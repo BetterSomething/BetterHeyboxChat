@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "author": "AwCat",
     "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
-    "desc": "为当前房间设置仅自己可见的自定义背景图。",
+    "desc": "为当前房间设置仅自己可见的自定义背景图",
     "minClientVersion": "1.56.0",
     "enabled": true,
     "entry": "index.js"
@@ -16,7 +16,7 @@
     "version": "1.0.0",
     "author": "AwCat",
     "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
-    "desc": "朗读当前正在查看的频道里的新文字消息。",
+    "desc": "朗读当前正在查看的频道里的新文字消息",
     "minClientVersion": "1.56.0",
     "enabled": true,
     "entry": "index.js"
@@ -27,7 +27,7 @@
     "version": "1.0.0",
     "author": "AwCat",
     "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
-    "desc": "在频道内收藏或取消收藏语音包后，立即刷新收藏列表。",
+    "desc": "在频道内收藏或取消收藏语音包后，立即刷新收藏列表",
     "minClientVersion": "1.56.0",
     "enabled": true,
     "entry": "index.js"
@@ -38,7 +38,7 @@
     "version": "1.0.0",
     "author": "AwCat",
     "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
-    "desc": "在屏幕共享画面上显示弹幕，并支持直接发送文字。",
+    "desc": "在屏幕共享画面上显示弹幕，并支持直接发送文字",
     "minClientVersion": "1.56.0",
     "enabled": true,
     "entry": "index.js"
@@ -49,7 +49,7 @@
     "version": "1.0.0",
     "author": "AwCat",
     "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
-    "desc": "屏蔽完整客户端更新和热更新，并在启动时检查补丁是否被覆盖。",
+    "desc": "屏蔽完整客户端更新和热更新，并在启动时检查补丁是否被覆盖",
     "minClientVersion": "1.56.0",
     "enabled": true,
     "entry": "index.js"

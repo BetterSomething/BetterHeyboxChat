@@ -10,7 +10,7 @@
 | 客户端 | 黑盒语音 **1.56.0**                                        |
 | 前端  | Vue **2.7 runtime-only** + Vuex + Webpack              |
 | 注入点 | 渲染进程；不要改主进程 `.jsm`                                     |
-| 调试  | 安装后 `F12` / `Ctrl+Shift+I`；右下角 **BH** 角标表示 runtime 已加载 |
+| 调试  | 安装后 `F12` / `Ctrl+Shift+I`；右下角 **BHC vx.x.x** 角标表示 runtime 已加载 |
 
 
 改仓库根目录 `runtime/` 后，用 **Debug** 安装器重装即可（不必 `cargo build`）。Release 安装器内嵌 runtime，改完要重新 `cargo build --release`。
@@ -148,7 +148,7 @@ BHChat.openSettings('betterheyboxchat');
 
 ## 调试检查单
 
-1. 重装补丁后右下角有 **BH**
+1. 重装补丁后右下角有 **BHC vx.x.x**
 2. 设置侧栏有 BetterHeyboxChat（在「隐私设置」与「语音和屏幕共享」之间）
 3. Console 无 `[BetterHeyboxChat] boot failed`
 4. 你的 `registerPanel` 区块出现在插件开关和 DevTools 之间

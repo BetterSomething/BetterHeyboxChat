@@ -145,5 +145,47 @@ if (!runtime.__webpack_require__('42416').Q4.some((item) => item.key === 'better
   throw new Error('FAIL: 设置侧栏未注入 BetterHeyboxChat');
 }
 
+function collectTexts(node, out) {
+  const acc = out || [];
+  if (node == null) return acc;
+  if (typeof node === 'string' || typeof node === 'number') {
+    acc.push(String(node));
+    return acc;
+  }
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectTexts(child, acc));
+    return acc;
+  }
+  if (node.children) collectTexts(node.children, acc);
+  return acc;
+}
+
+function h(tag, data, children) {
+  if (children === undefined && (typeof data === 'string' || Array.isArray(data))) {
+    return { tag, data: undefined, children: data };
+  }
+  return { tag, data, children };
+}
+
+const settingCtx = {
+  plugins: [],
+  panels: [],
+  restartStatus: '',
+  devToolsEnabled: true,
+  devToolsStatus: '',
+  indicatorVisible: true,
+  frameworkVersion: '0.1.0',
+  pendingRestart: false,
+  onRestart() {},
+  onToggleDevTools() {},
+  onOpenDevTools() {},
+  onToggleIndicator() {},
+};
+const settingTree = setting.render.call(settingCtx, h);
+const settingTexts = collectTexts(settingTree);
+if (!settingTexts.includes('显示角标')) {
+  throw new Error('FAIL: 设置页框架区未包含角标开关');
+}
+
 console.log('OK: webpack-hook 不再污染 UserConfig 缓存，组件已注册');
 process.exit(0);

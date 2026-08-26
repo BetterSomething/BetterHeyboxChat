@@ -65,6 +65,7 @@
           restartStatus: '',
           devToolsEnabled: true,
           devToolsStatus: '',
+          indicatorVisible: true,
         };
       },
       computed: {
@@ -80,6 +81,7 @@
       mounted: function () {
         this.refresh();
         this.refreshDevTools();
+        this.refreshIndicator();
         if (window.BHChat && window.BHChat.on) {
           window.BHChat.on('panel-registered', this.refreshPanels);
           window.BHChat.on('plugin-enabled-changed', this.refreshPlugins);
@@ -88,6 +90,7 @@
       activated: function () {
         this.refresh();
         this.refreshDevTools();
+        this.refreshIndicator();
       },
       beforeDestroy: function () {
         if (window.BHChat && window.BHChat.off) {
@@ -145,6 +148,20 @@
           } catch (err) {
             this.restartStatus = '重启失败，请手动重启黑盒语音。';
           }
+        },
+        refreshIndicator: function () {
+          var api = window.BHChat && window.BHChat.indicator;
+          if (!api || typeof api.isVisible !== 'function') return;
+          this.indicatorVisible = !!api.isVisible();
+        },
+        onToggleIndicator: function () {
+          var api = window.BHChat && window.BHChat.indicator;
+          if (!api || typeof api.setVisible !== 'function') return;
+          var self = this;
+          var next = !this.indicatorVisible;
+          Promise.resolve(api.setVisible(next)).then(function (result) {
+            self.indicatorVisible = result && typeof result.visible === 'boolean' ? result.visible : next;
+          });
         },
         onToggleDevTools: function () {
           var self = this;
@@ -278,6 +295,11 @@
                     (window.BHChat && window.BHChat.clientVersion) || 'unknown',
                   ),
                 ]),
+                h(
+                  'div',
+                  { class: 'row bhchat-row-click', on: { click: this.onToggleIndicator } },
+                  [h('span', '显示角标'), hSwitch(h, this.indicatorVisible)],
+                ),
               ]),
             ]),
             h('div', { class: 'cell' }, pluginChildren),

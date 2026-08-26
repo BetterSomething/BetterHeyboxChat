@@ -13,6 +13,8 @@
 | --- | --- | --- |
 | `BHChat.version` | `string` | 框架版本，当前 `0.1.0` |
 | `BHChat.clientVersion` | `string` | `window.asar_version`，未知时为 `'unknown'` |
+| `BHChat.indicator.isVisible()` | `boolean` | 右下角 `BHC vx.x.x` 角标是否显示 |
+| `BHChat.indicator.setVisible(on)` | `Promise<{visible}>` | 显示/隐藏角标，写入 `bhchat.indicator.visible` |
 
 ## 生命周期
 
