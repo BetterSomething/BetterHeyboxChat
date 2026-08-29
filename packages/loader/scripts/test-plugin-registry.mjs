@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const registryPath = path.resolve(__dirname, '../../../runtime/lib/plugin-registry.js');
+const pkg = require(path.resolve(__dirname, '../../../runtime/lib/plugin-package.js'));
 
 function assert(cond, message) {
   if (!cond) throw new Error('FAIL: ' + message);
@@ -19,20 +20,38 @@ assert(fs.existsSync(registryPath), '应存在 runtime/lib/plugin-registry.js');
 
 const registry = require(registryPath);
 
+const GITHUB_WEB_BASE =
+  'https://github.com/BetterSomething/BetterHeyboxChat-plugins/blob/main/';
+const MIRROR_PREFIX = 'https://gh.qmqaq.top/';
+const MIRROR_BASE = MIRROR_PREFIX + GITHUB_WEB_BASE;
+
 assert(
   registry.DEFAULT_BASE ===
     'https://raw.githubusercontent.com/BetterSomething/BetterHeyboxChat-plugins/main/',
   '默认 raw 基址应指向 BetterHeyboxChat-plugins/main/',
 );
+assert(registry.GITHUB_WEB_BASE === GITHUB_WEB_BASE, '加速源应拼接 GitHub blob 基址');
 
 assert(
   registry.resolveBase('') === registry.DEFAULT_BASE,
   '空加速源应回落到默认 GitHub raw',
 );
+assert(registry.resolveBase('gh.qmqaq.top') === MIRROR_BASE, '加速源缺协议时应补 https://');
+assert(registry.resolveBase('gh.qmqaq.top/') === MIRROR_BASE, '加速源缺协议且带尾斜杠时应规范化');
+assert(registry.resolveBase('https://gh.qmqaq.top') === MIRROR_BASE, '加速源已有 https 时应只补尾斜杠');
+assert(registry.resolveBase('https://gh.qmqaq.top/') === MIRROR_BASE, '加速源协议和斜杠齐全时应原样拼接');
 assert(
-  registry.resolveBase('https://mirror.example/BetterSomething/BetterHeyboxChat-plugins/main') ===
-    'https://mirror.example/BetterSomething/BetterHeyboxChat-plugins/main/',
-  '加速源应补上末尾斜杠',
+  registry.resolveBase('http://mirror.example') ===
+    'http://mirror.example/' + GITHUB_WEB_BASE,
+  '已写 http 的加速源应保留协议',
+);
+assert(
+  registry.joinUrl(MIRROR_BASE, 'registry.json') === MIRROR_BASE + 'registry.json',
+  '加速源下载地址应为 加速源 + GitHub blob 链接',
+);
+assert(
+  pkg.sanitizeHttpUrl(MIRROR_BASE + 'registry.json') === MIRROR_BASE + 'registry.json',
+  '加速源拼接后的完整 URL 应能通过下载地址校验',
 );
 assert(registry.resolveBase('javascript:alert(1)') === '', '非 http(s) 加速源应拒绝');
 assert(registry.resolveBase('ftp://x/') === '', 'ftp 加速源应拒绝');

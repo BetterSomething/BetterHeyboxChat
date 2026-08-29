@@ -10,6 +10,8 @@ var pkg = require('./plugin-package.js');
 
 var DEFAULT_BASE =
   'https://raw.githubusercontent.com/BetterSomething/BetterHeyboxChat-plugins/main/';
+var GITHUB_WEB_BASE =
+  'https://github.com/BetterSomething/BetterHeyboxChat-plugins/blob/main/';
 var MAX_FILES = 256;
 var MAX_TOTAL_BYTES = 40 * 1024 * 1024;
 var MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -18,13 +20,24 @@ function joinUrl(base, rel) {
   return String(base || '').replace(/\/+$/, '/') + String(rel || '').replace(/^\/+/, '');
 }
 
-function resolveBase(mirror) {
+function normalizeMirrorPrefix(mirror) {
   var raw = String(mirror || '').trim();
-  if (!raw) return DEFAULT_BASE;
+  if (!raw) return '';
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) {
+    raw = 'https://' + raw.replace(/^\/+/, '');
+  }
   var url = pkg.sanitizeHttpUrl(raw);
   if (!url) return '';
   if (url.charAt(url.length - 1) !== '/') url += '/';
   return url;
+}
+
+function resolveBase(mirror) {
+  var raw = String(mirror || '').trim();
+  if (!raw) return DEFAULT_BASE;
+  var prefix = normalizeMirrorPrefix(raw);
+  if (!prefix) return '';
+  return prefix + GITHUB_WEB_BASE;
 }
 
 function collectRemoteRelPaths(manifest) {
@@ -205,6 +218,7 @@ function inspectRemote(opts) {
 
 module.exports = {
   DEFAULT_BASE: DEFAULT_BASE,
+  GITHUB_WEB_BASE: GITHUB_WEB_BASE,
   resolveBase: resolveBase,
   joinUrl: joinUrl,
   parseRegistry: parseRegistry,
