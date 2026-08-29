@@ -41,7 +41,7 @@ flowchart TB
 
 ### 1. Loader / 安装器
 
-- 检测安装路径与版本（注册表 / 默认目录）
+- 检测安装路径与版本（注册表 / `%LOCALAPPDATA%\Qingfeng\HeyboxChat` / Program Files）
 - Patch：
   - `source/preload/index.js` — 末尾 `require` `betterheyboxchat/preload-bridge.js`
   - `webapp/index.html` — 先注入 `webpack-hook.js`，再注入 `loader.js`

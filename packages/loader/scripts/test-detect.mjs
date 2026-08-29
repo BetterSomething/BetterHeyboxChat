@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import {
   collectCandidateRoots,
+  defaultInstallFallbacks,
   stripIconIndex,
 } from '../dist/detect.js';
 
@@ -29,5 +31,23 @@ const manual = collectCandidateRoots({
   fallbacks: [String.raw`C:\Program Files\Qingfeng\HeyboxChat`],
 });
 assert.deepEqual(manual, [String.raw`E:\Games\HeyboxChat`]);
+
+const fallbacks = defaultInstallFallbacks();
+const localBase =
+  process.env.LOCALAPPDATA ||
+  (process.env.USERPROFILE
+    ? path.join(process.env.USERPROFILE, 'AppData', 'Local')
+    : '');
+if (localBase) {
+  assert.equal(
+    fallbacks[0],
+    path.join(localBase, 'Qingfeng', 'HeyboxChat'),
+    '官方默认目录应排在 fallback 首位: %LOCALAPPDATA%\\Qingfeng\\HeyboxChat',
+  );
+}
+assert.ok(
+  fallbacks.includes(String.raw`C:\Program Files\Qingfeng\HeyboxChat`),
+  '仍应保留 Program Files 候选',
+);
 
 console.log('OK: detect registry-first + DisplayIcon parse');

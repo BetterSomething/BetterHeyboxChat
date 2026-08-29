@@ -22,6 +22,7 @@ ${MARKER_END}
 
 export const SUPPORTED_CLIENT_VERSIONS = ['1.56.0'];
 
+/** Program Files 常见路径。官方默认目录 `%LOCALAPPDATA%\\Qingfeng\\HeyboxChat` 由 `defaultInstallFallbacks` 动态补上。 */
 export const DEFAULT_INSTALL_CANDIDATES = [
   'C:\\Program Files\\Qingfeng\\HeyboxChat',
   'C:\\Program Files (x86)\\Qingfeng\\HeyboxChat',

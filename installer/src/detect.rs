@@ -4,9 +4,37 @@ use crate::types::{ClientInstall, PackageJson};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+pub fn local_appdata_dir() -> Option<PathBuf> {
+    std::env::var_os("LOCALAPPDATA")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("USERPROFILE")
+                .filter(|v| !v.is_empty())
+                .map(|p| PathBuf::from(p).join("AppData").join("Local"))
+        })
+}
+
+/// 官方默认安装目录：`%LOCALAPPDATA%\Qingfeng\HeyboxChat`，其后是 Program Files 候选。
+pub fn default_install_fallbacks() -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    if let Some(local) = local_appdata_dir() {
+        out.push(local.join("Qingfeng").join("HeyboxChat"));
+    }
+    for candidate in DEFAULT_INSTALL_CANDIDATES {
+        let path = PathBuf::from(*candidate);
+        let key = path.to_string_lossy().to_lowercase();
+        if !out.iter().any(|existing| existing.to_string_lossy().to_lowercase() == key) {
+            out.push(path);
+        }
+    }
+    out
+}
+
 pub fn detect_install(manual_root: Option<&Path>) -> Option<ClientInstall> {
     let registry_roots = find_registry_install_roots();
-    let roots = collect_candidate_roots(manual_root, &registry_roots, DEFAULT_INSTALL_CANDIDATES);
+    let fallbacks = default_install_fallbacks();
+    let roots = collect_candidate_roots(manual_root, &registry_roots, &fallbacks);
 
     let mut seen = std::collections::HashSet::new();
     for root in roots {
@@ -27,14 +55,14 @@ pub fn detect_install(manual_root: Option<&Path>) -> Option<ClientInstall> {
 pub(crate) fn collect_candidate_roots(
     manual_root: Option<&Path>,
     registry_roots: &[PathBuf],
-    fallbacks: &[&str],
+    fallbacks: impl IntoIterator<Item = impl AsRef<Path>>,
 ) -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = Vec::new();
     if let Some(root) = manual_root {
         roots.push(root.to_path_buf());
     } else {
         roots.extend(registry_roots.iter().cloned());
-        roots.extend(fallbacks.iter().map(|p| PathBuf::from(*p)));
+        roots.extend(fallbacks.into_iter().map(|p| p.as_ref().to_path_buf()));
     }
 
     let mut seen = std::collections::HashSet::new();
@@ -320,6 +348,29 @@ mod tests {
     fn looks_like_accelerator_skips_heyboxacc() {
         assert!(looks_like_accelerator("黑盒加速器 1.1.84"));
         assert!(!looks_like_accelerator("黑盒语音 1.56.0"));
+    }
+
+    #[test]
+    fn fallbacks_put_localappdata_qingfeng_first() {
+        let local = std::env::var_os("LOCALAPPDATA")
+            .or_else(|| {
+                std::env::var_os("USERPROFILE")
+                    .map(|p| PathBuf::from(p).join("AppData").join("Local").into_os_string())
+            })
+            .expect("LOCALAPPDATA or USERPROFILE");
+        let expected = PathBuf::from(local).join("Qingfeng").join("HeyboxChat");
+        let fallbacks = default_install_fallbacks();
+        assert_eq!(
+            fallbacks.first(),
+            Some(&expected),
+            "官方默认目录应排在 fallback 首位: %LOCALAPPDATA%\\Qingfeng\\HeyboxChat"
+        );
+        assert!(
+            fallbacks
+                .iter()
+                .any(|p| p == Path::new(r"C:\Program Files\Qingfeng\HeyboxChat")),
+            "仍应保留 Program Files 候选"
+        );
     }
 }
 

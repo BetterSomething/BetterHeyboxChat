@@ -16,6 +16,7 @@ try { require('./betterheyboxchat/main-bridge.js'); } catch (e) { console.error(
 
 pub const SUPPORTED_CLIENT_VERSIONS: &[&str] = &["1.56.0"];
 
+/// Program Files 常见路径。官方默认目录 `%LOCALAPPDATA%\Qingfeng\HeyboxChat` 由 `default_install_fallbacks` 动态补上。
 pub const DEFAULT_INSTALL_CANDIDATES: &[&str] = &[
     r"C:\Program Files\Qingfeng\HeyboxChat",
     r"C:\Program Files (x86)\Qingfeng\HeyboxChat",

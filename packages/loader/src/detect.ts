@@ -25,6 +25,24 @@ export function stripIconIndex(value: string): string {
   return trimmed;
 }
 
+export function defaultInstallFallbacks(): string[] {
+  const localBase =
+    process.env.LOCALAPPDATA ||
+    (process.env.USERPROFILE
+      ? path.join(process.env.USERPROFILE, 'AppData', 'Local')
+      : '');
+  const out: string[] = [];
+  if (localBase) {
+    out.push(path.join(localBase, 'Qingfeng', 'HeyboxChat'));
+  }
+  for (const candidate of DEFAULT_INSTALL_CANDIDATES) {
+    if (!out.some((existing) => existing.toLowerCase() === candidate.toLowerCase())) {
+      out.push(candidate);
+    }
+  }
+  return out;
+}
+
 export function collectCandidateRoots(opts: {
   manualRoot?: string;
   registryRoots?: string[];
@@ -50,7 +68,7 @@ export async function detectInstall(installRoot?: string): Promise<ClientInstall
     ? collectCandidateRoots({ manualRoot: installRoot })
     : collectCandidateRoots({
         registryRoots: await findRegistryInstallRoots(),
-        fallbacks: DEFAULT_INSTALL_CANDIDATES,
+        fallbacks: defaultInstallFallbacks(),
       });
 
   const seen = new Set<string>();
