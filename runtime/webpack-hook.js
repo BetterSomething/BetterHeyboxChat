@@ -44,6 +44,14 @@
     );
   }
 
+  function findPanel(panels, id) {
+    if (!id || !panels || !panels.length) return null;
+    for (var i = 0; i < panels.length; i++) {
+      if (panels[i].id === id) return panels[i];
+    }
+    return null;
+  }
+
   function safeHttpUrl(value) {
     if (!value || typeof value !== 'string') return '';
     try {
@@ -62,6 +70,7 @@
         return {
           plugins: [],
           panels: [],
+          activePanelId: '',
           restartStatus: '',
           devToolsEnabled: true,
           devToolsStatus: '',
@@ -110,6 +119,9 @@
         refreshPanels: function () {
           this.panels =
             (window.BHChat && window.BHChat.listPanels && window.BHChat.listPanels()) || [];
+          if (this.activePanelId && !findPanel(this.panels, this.activePanelId)) {
+            this.activePanelId = '';
+          }
         },
         refreshDevTools: function () {
           var devtools = window.BHChat && window.BHChat.devtools;
@@ -125,6 +137,13 @@
           Promise.resolve(devtools.getStatus()).then(function (status) {
             self.devToolsStatus = status || '';
           });
+        },
+        onOpenPluginSettings: function (plugin) {
+          if (!plugin || !findPanel(this.panels, plugin.id)) return;
+          this.activePanelId = plugin.id;
+        },
+        onBackFromSettings: function () {
+          this.activePanelId = '';
         },
         onTogglePlugin: function (plugin) {
           if (!window.BHChat || !window.BHChat.setPluginEnabled) return;
@@ -186,6 +205,19 @@
       },
       render: function (h) {
         var self = this;
+        var activePanel = findPanel(this.panels, this.activePanelId);
+        if (activePanel) {
+          return h('div', { class: 'block betterheyboxchat-setting-block' }, [
+            h('p', { class: 'title' }, 'BetterHeyboxChat'),
+            h('div', { class: 'cell' }, [
+              h('div', { class: 'bhchat-panel-nav' }, [
+                hBtn(h, '返回', 'secondary', this.onBackFromSettings),
+              ]),
+              h(activePanel.component),
+            ]),
+          ]);
+        }
+
         var pluginRows = [];
         if (!this.plugins.length) {
           pluginRows.push(h('p', { class: 'bhchat-hint' }, '暂无插件。'));
@@ -225,6 +257,30 @@
             if (plugin.desc) {
               rowText.push(h('div', { class: 'bhchat-row-desc' }, plugin.desc));
             }
+            var rowActions = [];
+            if (findPanel(self.panels, plugin.id)) {
+              rowActions.push(
+                h(
+                  'button',
+                  {
+                    class: {
+                      'bhchat-btn': true,
+                      'bhchat-btn-secondary': true,
+                      'bhchat-btn-compact': true,
+                    },
+                    attrs: { type: 'button', title: '打开插件设置' },
+                    on: {
+                      click: function (e) {
+                        if (e && e.stopPropagation) e.stopPropagation();
+                        self.onOpenPluginSettings(plugin);
+                      },
+                    },
+                  },
+                  '设置',
+                ),
+              );
+            }
+            rowActions.push(hSwitch(h, plugin.enabled));
             pluginRows.push(
               h(
                 'div',
@@ -238,7 +294,7 @@
                 },
                 [
                   h('div', { class: 'bhchat-row-text' }, rowText),
-                  hSwitch(h, plugin.enabled),
+                  h('div', { class: 'bhchat-row-actions' }, rowActions),
                 ],
               ),
             );
@@ -256,10 +312,6 @@
         if (this.restartStatus) {
           pluginChildren.push(h('p', { class: 'bhchat-hint' }, this.restartStatus));
         }
-
-        var panelNodes = this.panels.map(function (panel) {
-          return h('div', { class: 'cell', key: panel.id }, [h(panel.component)]);
-        });
 
         var dtChildren = [
           h('div', { class: 'cell-title' }, '开发者工具'),
@@ -303,9 +355,8 @@
               ]),
             ]),
             h('div', { class: 'cell' }, pluginChildren),
-          ]
-            .concat(panelNodes)
-            .concat([h('div', { class: 'cell' }, dtChildren)]),
+            h('div', { class: 'cell' }, dtChildren),
+          ],
         );
       },
     };
@@ -322,6 +373,9 @@
       '.betterheyboxchat-setting-block .bhchat-row-click{cursor:pointer}',
       '.betterheyboxchat-setting-block .bhchat-row-click:hover{filter:brightness(1.08)}',
       '.betterheyboxchat-setting-block .bhchat-row-text{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;flex:1;padding-right:12px}',
+      '.betterheyboxchat-setting-block .bhchat-row-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}',
+      '.betterheyboxchat-setting-block .bhchat-btn-compact{height:28px;padding:0 10px;font-size:12px;line-height:16px}',
+      '.betterheyboxchat-setting-block .bhchat-panel-nav{display:flex;align-items:center;gap:8px;margin:0 0 8px}',
       '.betterheyboxchat-setting-block .bhchat-row-sub{font-size:12px;line-height:16px;color:var(--text-3,#8b8e93);display:flex;align-items:center;flex-wrap:wrap;gap:6px}',
       '.betterheyboxchat-setting-block .bhchat-row-desc{font-size:12px;line-height:18px;color:var(--text-3,#8b8e93);white-space:pre-wrap;word-break:break-word}',
       '.betterheyboxchat-setting-block .bhchat-row-value{color:var(--text-3,#8b8e93);font-size:13px}',

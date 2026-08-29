@@ -56,7 +56,7 @@ flowchart TB
 
 | 文件 | 职责 |
 | --- | --- |
-| `webpack-hook.js` | hook `webpackChunkheybox_chat.push`；注入设置侧栏；渲染 `BHChat.listPanels()` |
+| `webpack-hook.js` | hook `webpackChunkheybox_chat.push`；注入设置侧栏；已安装插件列表按 `panel.id === plugin.id` 挂「设置」，钻取渲染对应 panel |
 | `runtime.js` | 稳定 `window.BHChat`（Vue/Vuex、事件、存储、启停、重启） |
 | `loader.js` | 读 `bhchat.plugins.enabled`，跳过禁用插件，再 `_ready()` |
 | `lib/storage.js` | `electronAPI` 优先，回退 `localStorage` |
@@ -124,7 +124,7 @@ window.BHChat = {
 - 必须在 webpack 主包之前同步加载；主包会覆盖 `push`，因此定时 re-hook
 - 禁止在工厂未就绪时 `__webpack_require__(93509)`（会污染缓存，设置弹窗永久打不开）
 - 设置组件必须用 `render(h)`：官方 Vue 是 runtime-only
-- 插件设置区块通过 `registerPanel({ id, title, component })` 挂载，不要改 hook 源码
+- 插件设置通过 `registerPanel({ id, title, component })` 挂载（`id` 须等于插件 id）；设置页从已安装插件列表钻取打开，不要改 hook 源码
 
 ## 阶段状态
 

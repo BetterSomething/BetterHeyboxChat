@@ -151,7 +151,7 @@ BHChat.openSettings('betterheyboxchat');
 1. 重装补丁后右下角有 **BHC vx.x.x**
 2. 设置侧栏有 BetterHeyboxChat（在「隐私设置」与「语音和屏幕共享」之间）
 3. Console 无 `[BetterHeyboxChat] boot failed`
-4. 你的 `registerPanel` 区块出现在插件开关和 DevTools 之间
+4. 已安装插件里对应项出现「设置」；点开能看到你的 `registerPanel` 页面，点「返回」回到列表
 5. 关掉插件 → 点立即重启 → 该区块消失、入口脚本不再执行
 
 

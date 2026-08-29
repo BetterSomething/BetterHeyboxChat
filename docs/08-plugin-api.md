@@ -110,15 +110,15 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 
 ### `registerPanel({ id, title, component }): boolean`
 
-把区块挂到设置 → BetterHeyboxChat。
+把插件设置页挂到设置 → BetterHeyboxChat → 已安装插件。列表里只有 `id` **等于插件 id** 的项会显示「设置」按钮；点开后钻取到该 `component`，点「返回」回到列表。
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `id` | 是 | 唯一。重复注册会覆盖 |
-| `title` | 否 | 显示名，缺省为 `id` |
+| `id` | 是 | 必须与插件 `id` 相同，否则列表不出现「设置」。重复注册会覆盖 |
+| `title` | 否 | 显示名，缺省为 `id`（钻取页仍由 `component` 自己画标题） |
 | `component` | 是 | Vue 2 选项对象，**必须**有 `render(h)` |
 
-失败（缺字段或没有 `render`）返回 `false` 并 `console.warn`。
+失败（缺字段或没有 `render`）返回 `false` 并 `console.warn`。未加载的插件不会执行 `registerPanel`，因此也没有设置按钮。
 
 ### `listPanels(): Array<{ id, title, component }>`
 

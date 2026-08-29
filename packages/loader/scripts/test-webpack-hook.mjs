@@ -160,6 +160,18 @@ function collectTexts(node, out) {
   return acc;
 }
 
+function findVnodes(node, pred, out) {
+  const acc = out || [];
+  if (node == null || typeof node !== 'object') return acc;
+  if (Array.isArray(node)) {
+    node.forEach((child) => findVnodes(child, pred, acc));
+    return acc;
+  }
+  if (pred(node)) acc.push(node);
+  if (node.children) findVnodes(node.children, pred, acc);
+  return acc;
+}
+
 function h(tag, data, children) {
   if (children === undefined && (typeof data === 'string' || Array.isArray(data))) {
     return { tag, data: undefined, children: data };
@@ -167,24 +179,106 @@ function h(tag, data, children) {
   return { tag, data, children };
 }
 
-const settingCtx = {
-  plugins: [],
-  panels: [],
-  restartStatus: '',
-  devToolsEnabled: true,
-  devToolsStatus: '',
-  indicatorVisible: true,
-  frameworkVersion: '0.1.0',
-  pendingRestart: false,
-  onRestart() {},
-  onToggleDevTools() {},
-  onOpenDevTools() {},
-  onToggleIndicator() {},
-};
-const settingTree = setting.render.call(settingCtx, h);
+const panelComponent = { name: 'FakePluginPanel', render() {} };
+
+function createSettingCtx(overrides) {
+  return Object.assign(
+    {
+      plugins: [],
+      panels: [],
+      activePanelId: '',
+      restartStatus: '',
+      devToolsEnabled: true,
+      devToolsStatus: '',
+      indicatorVisible: true,
+      frameworkVersion: '0.1.0',
+      pendingRestart: false,
+      onRestart() {},
+      onToggleDevTools() {},
+      onOpenDevTools() {},
+      onToggleIndicator() {},
+      onTogglePlugin() {},
+      onOpenPluginSettings() {},
+      onBackFromSettings() {},
+    },
+    overrides,
+  );
+}
+
+const settingTree = setting.render.call(createSettingCtx(), h);
 const settingTexts = collectTexts(settingTree);
 if (!settingTexts.includes('显示角标')) {
   throw new Error('FAIL: 设置页框架区未包含角标开关');
+}
+
+const pluginWithPanel = {
+  id: 'custom-room-bg',
+  name: '自定义房间背景',
+  version: '1.0.0',
+  author: 'AwCat',
+  repository: '',
+  desc: '测试描述',
+  enabled: true,
+  loaded: true,
+};
+const pluginWithoutPanel = {
+  id: 'no-settings-plugin',
+  name: '无设置插件',
+  version: '1.0.0',
+  author: '',
+  repository: '',
+  desc: '',
+  enabled: true,
+  loaded: true,
+};
+const registeredPanel = {
+  id: 'custom-room-bg',
+  title: '自定义房间背景',
+  component: panelComponent,
+};
+
+const listTree = setting.render.call(
+  createSettingCtx({
+    plugins: [pluginWithPanel, pluginWithoutPanel],
+    panels: [registeredPanel],
+  }),
+  h,
+);
+const listTexts = collectTexts(listTree);
+if (!listTexts.includes('已安装插件')) {
+  throw new Error('FAIL: 列表视图应显示已安装插件');
+}
+if (!listTexts.includes('设置')) {
+  throw new Error('FAIL: 有 registerPanel 的插件行应有「设置」按钮');
+}
+if (findVnodes(listTree, (node) => node.tag === panelComponent).length) {
+  throw new Error('FAIL: 列表视图不应再纵向堆插件设置 panel');
+}
+const settingsButtons = findVnodes(
+  listTree,
+  (node) => node.tag === 'button' && collectTexts(node).includes('设置'),
+);
+if (settingsButtons.length !== 1) {
+  throw new Error('FAIL: 只有匹配 panel.id 的插件才显示「设置」，实际 ' + settingsButtons.length);
+}
+
+const detailTree = setting.render.call(
+  createSettingCtx({
+    plugins: [pluginWithPanel, pluginWithoutPanel],
+    panels: [registeredPanel],
+    activePanelId: 'custom-room-bg',
+  }),
+  h,
+);
+const detailTexts = collectTexts(detailTree);
+if (!detailTexts.includes('返回')) {
+  throw new Error('FAIL: 插件设置钻取视图应有「返回」');
+}
+if (detailTexts.includes('已安装插件')) {
+  throw new Error('FAIL: 钻取视图不应再显示插件列表');
+}
+if (!findVnodes(detailTree, (node) => node.tag === panelComponent).length) {
+  throw new Error('FAIL: 钻取视图应渲染对应插件的 panel');
 }
 
 console.log('OK: webpack-hook 不再污染 UserConfig 缓存，组件已注册');
