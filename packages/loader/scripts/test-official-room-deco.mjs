@@ -136,6 +136,8 @@ assert(
 );
 assert(!/HELPERS_SRC/.test(pluginIndex), '探测插件不应再依赖 deco.js 的 script src');
 assert(/textarea/.test(pluginIndex), '探测结果应使用 textarea 便于复制完整 payload');
+assert(!/location\.reload/.test(pluginIndex), '换背景后不得刷新整个前端');
+assert(!/window\.confirm/.test(pluginIndex), '不得使用原生 confirm（会打掉输入焦点）');
 
 const pluginsJson = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../../../runtime/plugins.json'), 'utf8'),

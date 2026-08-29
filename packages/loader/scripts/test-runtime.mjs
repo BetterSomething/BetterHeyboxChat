@@ -385,6 +385,8 @@ assert(/registerPanel/.test(officialDecoSource), '官方背景探测应通过 re
 assert(/room_deco_pic/.test(officialDecoSource), '官方背景探测换图应走 room_deco_pic');
 assert(/26737/.test(officialDecoSource) && /\.DC\b/.test(officialDecoSource), '官方背景探测应调用 26737.DC');
 assert(!/canChangeBgPic\s*\(/.test(officialDecoSource), '官方背景探测不得调用 canChangeBgPic()');
+assert(!/location\.reload/.test(officialDecoSource), '官方背景探测换背景后不得刷新整个前端');
+assert(!/window\.confirm/.test(officialDecoSource), '官方背景探测不得使用原生 confirm');
 
 const blockSource = fs.readFileSync(
   path.resolve(__dirname, '../../../runtime/plugins/block-update/index.js'),

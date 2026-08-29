@@ -225,50 +225,6 @@
     }
   }
 
-  var RELOAD_CONFIRM = '更改房间背景需刷新黑盒语音前端，避免一些历史遗留问题, 继续吗？';
-
-  function getOfficialVue() {
-    var app = document.getElementById('app');
-    return (app && app.__vue__) || null;
-  }
-
-  function getQueryDialog(vm) {
-    if (vm && typeof vm.$query === 'function') return vm.$query.bind(vm);
-    var root = getOfficialVue();
-    if (root && typeof root.$query === 'function') return root.$query.bind(root);
-    var Vue = root && ((root.$root && root.$root.constructor) || root.constructor);
-    if (Vue && Vue.prototype && typeof Vue.prototype.$query === 'function') {
-      return Vue.prototype.$query.bind(root || vm || Vue.prototype);
-    }
-    return null;
-  }
-
-  function confirmDecorateReload(vm, onYes) {
-    var query = getQueryDialog(vm);
-    if (!query) {
-      if (vm) {
-        vm.statusText = '官方确认框不可用，已取消（不用系统弹窗，以免打掉输入焦点）';
-      }
-      return;
-    }
-    query({
-      config: {
-        title: RELOAD_CONFIRM,
-        confirm: { text: '确定' },
-        cancel: { text: '取消' },
-      },
-      confirmCB: onYes,
-    });
-  }
-
-  function reloadFrontend() {
-    window.location.reload();
-  }
-
-  function afterDecorateOk() {
-    reloadFrontend();
-  }
-
   async function submitDecorate(patch) {
     var helpers = getHelpers();
     var room = getCurrentRoom();
@@ -278,7 +234,6 @@
     var res = await decorateRoom(payload);
     var parsed = helpers.parseDecorateResult(res);
     parsed.payload = payload;
-    if (parsed.ok) afterDecorateOk();
     return parsed;
   }
 
@@ -425,24 +380,19 @@
             });
         },
         onForceUpload: function () {
-          var self = this;
           if (!this._file) {
             this.statusText = '请先选择一张图片';
             return;
           }
-          confirmDecorateReload(this, function () {
-            self.run(function () {
-              return forceUpload(self._file);
-            }, '正在走官方上传 + decorate…');
-          });
+          var self = this;
+          this.run(function () {
+            return forceUpload(self._file);
+          }, '正在走官方上传 + decorate…');
         },
         onProbeCurrent: function () {
-          var self = this;
-          confirmDecorateReload(this, function () {
-            self.run(function () {
-              return submitDecorate({});
-            }, '正在提交当前主题…');
-          });
+          this.run(function () {
+            return submitDecorate({});
+          }, '正在提交当前主题…');
         },
         onApplying: function () {
           this.run(function () {
