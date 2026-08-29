@@ -1,0 +1,11 @@
+{
+  "id": "export-credentials",
+  "name": "用户凭据导出",
+  "version": "1.0.0",
+  "author": "AwCat",
+  "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
+  "desc": "一键导出当前登录态、query 参数和会话 Cookie，供独立脚本调用官方接口",
+  "minClientVersion": "1.56.0",
+  "enabled": true,
+  "entry": "index.js"
+}

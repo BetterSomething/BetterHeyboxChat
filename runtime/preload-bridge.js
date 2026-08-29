@@ -175,6 +175,13 @@
         return patchGuard.writeBlockFlags(__dirname, flags);
       },
     },
+    cookies: {
+      get: function (url) {
+        return ipcRenderer.invoke('bhchat:get-session-cookies', {
+          url: url || 'https://api.xiaoheihe.cn',
+        });
+      },
+    },
   };
 
   console.log('[BetterHeyboxChat] preload bridge loaded');

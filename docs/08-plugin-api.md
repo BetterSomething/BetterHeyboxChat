@@ -258,6 +258,12 @@ BHChat.officialRoomDeco.decorate(patch?)
 BHChat.officialRoomDeco.applying()
 ```
 
+`export-credentials` 启用后挂载（从当前登录态收集官方 API query / Cookie，**不要**把结果写入仓库）：
+
+```javascript
+BHChat.exportCredentials.snapshot()
+```
+
 第三方插件不要依赖这些名字，除非你明确依赖该插件。
 
 ## 错误与边界

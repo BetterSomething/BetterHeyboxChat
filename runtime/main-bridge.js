@@ -31,6 +31,22 @@ function isDevToolsEnabled() {
   }
 }
 
+function isAllowedCookieUrl(url) {
+  try {
+    const parsed = new URL(String(url || ''));
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host === 'xiaoheihe.cn' ||
+      host.endsWith('.xiaoheihe.cn') ||
+      host === 'max-c.com' ||
+      host.endsWith('.max-c.com')
+    );
+  } catch (err) {
+    return false;
+  }
+}
+
 function attachShortcuts(win) {
   if (!win || !win.webContents || win.webContents.isDestroyed()) return;
   if (win.webContents.__bhchat_dt) return;
@@ -99,6 +115,28 @@ function patchElectron(mod) {
         else wc.openDevTools({ mode: 'detach' });
       } catch (err) {
         console.warn('[BetterHeyboxChat] ipc openDevTools failed:', err);
+      }
+    });
+    mod.ipcMain.handle('bhchat:get-session-cookies', async (event, filter) => {
+      const url = (filter && filter.url) || 'https://api.xiaoheihe.cn';
+      if (!isAllowedCookieUrl(url)) return [];
+      try {
+        const sender = event && event.sender;
+        if (!sender || sender.isDestroyed() || !sender.session || !sender.session.cookies) {
+          return [];
+        }
+        const list = await sender.session.cookies.get({ url: url });
+        return (list || []).map((item) => ({
+          name: item.name,
+          value: item.value,
+          domain: item.domain,
+          path: item.path,
+          httpOnly: !!item.httpOnly,
+          secure: !!item.secure,
+        }));
+      } catch (err) {
+        console.warn('[BetterHeyboxChat] get session cookies failed:', err);
+        return [];
       }
     });
   }

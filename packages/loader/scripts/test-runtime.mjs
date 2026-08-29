@@ -376,6 +376,10 @@ assert(
   pluginsManifest.some((p) => p.id === 'official-room-deco' && p.entry === 'index.js'),
   'plugins.json 应注册 official-room-deco',
 );
+assert(
+  pluginsManifest.some((p) => p.id === 'export-credentials' && p.entry === 'index.js'),
+  'plugins.json 应注册 export-credentials',
+);
 
 const officialDecoSource = fs.readFileSync(
   path.resolve(__dirname, '../../../runtime/plugins/official-room-deco/index.js'),

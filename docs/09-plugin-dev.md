@@ -208,5 +208,10 @@ BHChat.openSettings('betterheyboxchat');
 - 开关写入 `betterheyboxchat/update-block.json`，由 main-bridge 在主进程拦截 IPC
 - 可调用 `BHChat.patch.ensure()` 立刻补回被热更新盖掉的 html / preload 注入
 
+内置 `runtime/plugins/export-credentials/`：
+
+- 设置页一键导出当前 `heybox_id` / `pkey`、官方 API query 和 `api.xiaoheihe.cn` 会话 Cookie
+- 给独立脚本用；**不要**发给别人或提交仓库。插件本身不把凭据写入 `BHChat.storage`
+
 复制 `custom-room-bg` 目录是最快的起步方式。
 
