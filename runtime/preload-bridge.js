@@ -139,8 +139,14 @@
       uninstall: function (id) {
         return pluginStore.uninstall(id);
       },
-      fetchRegistry: function (mirror) {
-        return pluginStore.fetchRegistry({ mirror: mirror });
+      fetchRegistry: function (opts) {
+        if (opts && typeof opts === 'object') {
+          return pluginStore.fetchRegistry(opts);
+        }
+        return pluginStore.fetchRegistry({ mirror: opts });
+      },
+      resolveLocalRoot: function (p) {
+        return pluginStore.resolveLocalRoot(p);
       },
       inspectRemote: function (opts) {
         return pluginStore.inspectRemote(opts || {});

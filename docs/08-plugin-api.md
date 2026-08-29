@@ -168,11 +168,12 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 | `inspectZipPath(path)` / `inspectZipBuffer(buf)` / `inspectFolderPath(path)` | 解析包并返回洗白后的 manifest，不写盘 |
 | `installZipPath` / `installZipBuffer` / `installFolderPath` | 写入 `{dataRoot}/plugins/<id>/` |
 | `uninstall(id)` | 仅允许用户插件 |
-| `fetchRegistry(mirror?)` | GET 货架 `registry.json`（Promise） |
-| `inspectRemote({ id, mirror, clientVersion })` | 按需下载插件目录，不写盘 |
-| `installRemote({ id, mirror, clientVersion })` | 确认后写入用户插件目录 |
+| `fetchRegistry(mirrorOrOpts?)` | 拉货架 `registry.json`（Promise）。可传字符串加速源，或 `{ mirror, localDebug, localRoot }` |
+| `resolveLocalRoot(path)` | 把绝对路径上溯到含 `registry.json` 的仓根；相对路径拒绝 |
+| `inspectRemote({ id, mirror, clientVersion, localRoot })` | 按需取插件目录，不写盘 |
+| `installRemote({ id, mirror, clientVersion, localRoot })` | 确认后写入用户插件目录 |
 
-默认货架：`https://raw.githubusercontent.com/BetterSomething/BetterHeyboxChat-plugins/main/`。`mirror` 为可替换的 https 前缀。不在页面里执行远程脚本。
+默认货架：`https://raw.githubusercontent.com/BetterSomething/BetterHeyboxChat-plugins/main/`。`mirror` 为可替换的 https 前缀。`localDebug` 为真或 `localRoot` 非空时改为读本地目录，失败不回落 GitHub。不在页面里执行远程脚本。
 
 inspect 结果供设置页确认框使用。`desc`/`name`/`author` 已去除 HTML 与控制字符。`repository` 只保留 http(s)。
 

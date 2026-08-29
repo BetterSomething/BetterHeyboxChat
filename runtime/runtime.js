@@ -392,8 +392,11 @@
       uninstall: function (id) {
         return callPluginStore('uninstall', id);
       },
-      fetchRegistry: function (mirror) {
-        return callPluginStore('fetchRegistry', mirror);
+      fetchRegistry: function (opts) {
+        return callPluginStore('fetchRegistry', opts);
+      },
+      resolveLocalRoot: function (p) {
+        return callPluginStore('resolveLocalRoot', p);
       },
       inspectRemote: function (opts) {
         return callPluginStore('inspectRemote', opts);

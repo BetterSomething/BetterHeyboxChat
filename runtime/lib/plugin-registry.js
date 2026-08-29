@@ -4,8 +4,10 @@
  */
 'use strict';
 
+var fs = require('fs');
 var http = require('http');
 var https = require('https');
+var path = require('path');
 var pkg = require('./plugin-package.js');
 
 var DEFAULT_BASE =
@@ -142,6 +144,106 @@ function defaultFetch(url, redirects) {
   });
 }
 
+function isPathInside(root, candidate) {
+  var rootAbs = path.resolve(root);
+  var candAbs = path.resolve(candidate);
+  var rel = path.relative(rootAbs, candAbs);
+  if (rel === '') return true;
+  if (path.isAbsolute(rel)) return false;
+  var parts = rel.split(/[\\/]/);
+  return parts.indexOf('..') === -1;
+}
+
+function resolveLocalRoot(input) {
+  var raw = String(input == null ? '' : input).trim();
+  if (!raw) return { ok: false, error: '未设置本地插件仓路径' };
+  if (!path.isAbsolute(raw)) return { ok: false, error: '本地插件仓路径必须是绝对路径' };
+  var dir = path.normalize(raw);
+  try {
+    if (fs.statSync(dir).isFile()) dir = path.dirname(dir);
+  } catch (err) {
+    return { ok: false, error: '本地插件仓路径不存在' };
+  }
+  for (var i = 0; i < 6; i++) {
+    if (fs.existsSync(path.join(dir, 'registry.json'))) {
+      return { ok: true, root: dir };
+    }
+    var parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return { ok: false, error: '未找到 registry.json' };
+}
+
+function fetchLocalRegistry(localRoot) {
+  var resolved = resolveLocalRoot(localRoot);
+  if (!resolved.ok) return resolved;
+  try {
+    return parseRegistry(fs.readFileSync(path.join(resolved.root, 'registry.json'), 'utf8'));
+  } catch (err) {
+    return { ok: false, error: '无法读取本地货架: ' + ((err && err.message) || err) };
+  }
+}
+
+function inspectLocal(opts) {
+  var resolved = resolveLocalRoot(opts && opts.localRoot);
+  if (!resolved.ok) return Promise.resolve(resolved);
+  var id = pkg.sanitizePlainText(opts && opts.id, 64);
+  if (!pkg.ID_RE.test(id)) {
+    return Promise.resolve({ ok: false, error: '非法插件 id' });
+  }
+  var pluginDir = path.join(resolved.root, id);
+  if (!isPathInside(resolved.root, pluginDir)) {
+    return Promise.resolve({ ok: false, error: '无法下载插件: 非法插件路径' });
+  }
+  var manifestPath = path.join(pluginDir, 'manifest.json');
+  if (!fs.existsSync(manifestPath) || !isPathInside(pluginDir, manifestPath)) {
+    return Promise.resolve({ ok: false, error: '无法下载插件: 本地缺少 manifest.json' });
+  }
+  try {
+    var manifestBuf = fs.readFileSync(manifestPath);
+    var parsed = pkg.parseManifest(manifestBuf.toString('utf8'));
+    if (!parsed.ok) return Promise.resolve(parsed);
+    if (parsed.manifest.id !== id) {
+      return Promise.resolve({ ok: false, error: 'manifest id 与目录不一致' });
+    }
+    if (!pkg.compareClientVersion(opts.clientVersion, parsed.manifest.minClientVersion)) {
+      return Promise.resolve({ ok: false, error: '需要客户端 ' + parsed.manifest.minClientVersion });
+    }
+    var rels = collectRemoteRelPaths(parsed.manifest);
+    if (rels.length > MAX_FILES) {
+      return Promise.resolve({ ok: false, error: '插件文件过多' });
+    }
+    var map = {};
+    var total = 0;
+    for (var i = 0; i < rels.length; i++) {
+      var rel = rels[i];
+      var filePath = path.join(pluginDir, rel);
+      if (!isPathInside(pluginDir, filePath)) {
+        return Promise.resolve({ ok: false, error: '无法下载插件: 非法文件路径' });
+      }
+      if (!fs.existsSync(filePath)) {
+        return Promise.resolve({ ok: false, error: '无法下载插件: 缺少 ' + rel });
+      }
+      var buf = fs.readFileSync(filePath);
+      total += buf.length;
+      if (total > MAX_TOTAL_BYTES) {
+        return Promise.resolve({ ok: false, error: '插件过大' });
+      }
+      map[rel] = buf;
+    }
+    var inspected = pkg.inspectFileMap(map);
+    if (!inspected.ok) return Promise.resolve(inspected);
+    if (inspected.manifest.id !== id) {
+      return Promise.resolve({ ok: false, error: 'manifest id 与目录不一致' });
+    }
+    inspected.source = 'local';
+    return Promise.resolve(inspected);
+  } catch (err) {
+    return Promise.resolve({ ok: false, error: '无法下载插件: ' + ((err && err.message) || err) });
+  }
+}
+
 function fetchBuffer(opts, rel) {
   var base = resolveBase(opts && opts.mirror);
   if (!base) return Promise.reject(new Error('加速源 URL 不合法'));
@@ -149,8 +251,15 @@ function fetchBuffer(opts, rel) {
   return Promise.resolve(fetch(joinUrl(base, rel)));
 }
 
+function wantsLocal(opts) {
+  return !!(opts && (opts.localDebug || String(opts.localRoot || '').trim()));
+}
+
 function fetchRegistry(opts) {
   opts = opts || {};
+  if (wantsLocal(opts)) {
+    return Promise.resolve(fetchLocalRegistry(opts.localRoot));
+  }
   return fetchBuffer(opts, 'registry.json')
     .then(function (buf) {
       return parseRegistry(Buffer.isBuffer(buf) ? buf.toString('utf8') : String(buf));
@@ -162,6 +271,9 @@ function fetchRegistry(opts) {
 
 function inspectRemote(opts) {
   opts = opts || {};
+  if (wantsLocal(opts)) {
+    return inspectLocal(opts);
+  }
   var id = pkg.sanitizePlainText(opts.id, 64);
   if (!pkg.ID_RE.test(id)) {
     return Promise.resolve({ ok: false, error: '非法插件 id' });
@@ -223,6 +335,7 @@ module.exports = {
   joinUrl: joinUrl,
   parseRegistry: parseRegistry,
   collectRemoteRelPaths: collectRemoteRelPaths,
+  resolveLocalRoot: resolveLocalRoot,
   fetchRegistry: fetchRegistry,
   inspectRemote: inspectRemote,
 };

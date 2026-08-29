@@ -40,26 +40,17 @@
     return false;
   }
 
-  function dropHelper() {
-    return window.BHChatOsFileDrop || null;
-  }
-
   function filePathOf(file) {
-    var helper = dropHelper();
-    var getter = function (f) {
-      var api = pluginsApi();
-      if (!api.getPathForFile) return '';
-      try {
-        var resolved = api.getPathForFile(f);
-        return typeof resolved === 'string' ? resolved : '';
-      } catch (err) {
-        return '';
-      }
-    };
-    if (helper && helper.resolveDroppedPath) {
-      return helper.resolveDroppedPath(file, getter);
+    if (!file) return '';
+    if (file.path) return String(file.path);
+    var api = pluginsApi();
+    if (!api.getPathForFile) return '';
+    try {
+      var resolved = api.getPathForFile(file);
+      return typeof resolved === 'string' ? resolved : '';
+    } catch (err) {
+      return '';
     }
-    return getter(file) || (file && file.path) || '';
   }
 
   function isZipFile(file) {
@@ -107,13 +98,16 @@
     });
   }
 
-  function installPending(pending, mirror) {
+  function installPending(pending, opts) {
     var api = pluginsApi();
+    opts = opts || {};
     if (pending.remoteId && api.installRemote) {
       return api.installRemote({
         id: pending.remoteId,
-        mirror: mirror,
+        mirror: opts.mirror,
         clientVersion: clientVersion(),
+        localDebug: !!opts.localDebug,
+        localRoot: opts.localRoot || '',
       });
     }
     if (pending.zipPath && api.installZipPath) return api.installZipPath(pending.zipPath);
@@ -131,30 +125,39 @@
 
   function loadSettings() {
     var ns = getNs();
-    if (!ns) return Promise.resolve({ mirror: DEFAULT_MIRROR });
+    if (!ns) return Promise.resolve({ mirror: DEFAULT_MIRROR, localDebug: false, localRoot: '' });
     return ns.get(STORAGE_KEY).then(function (saved) {
       saved = saved && typeof saved === 'object' ? saved : {};
-      return { mirror: typeof saved.mirror === 'string' ? saved.mirror.trim() : '' };
+      return {
+        mirror: typeof saved.mirror === 'string' ? saved.mirror.trim() : '',
+        localDebug: !!saved.localDebug,
+        localRoot: typeof saved.localRoot === 'string' ? saved.localRoot.trim() : '',
+      };
     });
   }
 
   function saveSettings(settings) {
     var ns = getNs();
     if (!ns) return Promise.resolve();
-    return ns.set(STORAGE_KEY, { mirror: (settings.mirror || '').trim() });
+    return ns.set(STORAGE_KEY, {
+      mirror: (settings.mirror || '').trim(),
+      localDebug: !!settings.localDebug,
+      localRoot: (settings.localRoot || '').trim(),
+    });
   }
 
   function buildPanelComponent() {
     return {
       data: function () {
         return {
-          dragging: false,
           status: '',
           error: '',
           pending: null,
           userPlugins: [],
           catalog: [],
           mirror: DEFAULT_MIRROR,
+          localDebug: false,
+          localRoot: '',
           loadingCatalog: false,
         };
       },
@@ -163,48 +166,10 @@
         this.refreshUserPlugins();
         loadSettings().then(function (settings) {
           self.mirror = settings.mirror || '';
+          self.localDebug = !!settings.localDebug;
+          self.localRoot = settings.localRoot || '';
           self.refreshCatalog();
         });
-      },
-      mounted: function () {
-        var self = this;
-        var helper = dropHelper();
-        if (!helper) return;
-        this._onOsDragOver = function (e) {
-          if (!helper.isOsFileDrag(e)) return;
-          if (!helper.eventInside(self.$el, e)) return;
-          helper.acceptOsFileDrag(e);
-          self.dragging = helper.eventInside(self.$refs.dropzone, e);
-        };
-        this._onOsDragLeave = function (e) {
-          if (!helper.eventInside(self.$refs.dropzone, e)) self.dragging = false;
-        };
-        this._onOsDrop = function (e) {
-          if (!helper.isOsFileDrag(e)) return;
-          if (!helper.eventInside(self.$el, e)) return;
-          helper.acceptOsFileDrag(e);
-          self.dragging = false;
-          var files = helper.filesFromDropEvent(e);
-          if (files[0]) self.beginInspect(files[0]);
-        };
-        var opts = { capture: true };
-        document.addEventListener('dragenter', this._onOsDragOver, opts);
-        document.addEventListener('dragover', this._onOsDragOver, opts);
-        document.addEventListener('dragleave', this._onOsDragLeave, opts);
-        document.addEventListener('drop', this._onOsDrop, opts);
-      },
-      beforeDestroy: function () {
-        var opts = { capture: true };
-        if (this._onOsDragOver) {
-          document.removeEventListener('dragenter', this._onOsDragOver, opts);
-          document.removeEventListener('dragover', this._onOsDragOver, opts);
-        }
-        if (this._onOsDragLeave) {
-          document.removeEventListener('dragleave', this._onOsDragLeave, opts);
-        }
-        if (this._onOsDrop) {
-          document.removeEventListener('drop', this._onOsDrop, opts);
-        }
       },
       methods: {
         refreshUserPlugins: function () {
@@ -220,6 +185,20 @@
           });
           return map;
         },
+        catalogLocalRoot: function () {
+          return this.localDebug ? String(this.localRoot || '').trim() : '';
+        },
+        persistSettings: function (status) {
+          var self = this;
+          return saveSettings({
+            mirror: this.mirror,
+            localDebug: this.localDebug,
+            localRoot: this.localRoot,
+          }).then(function () {
+            self.status = status || '';
+            self.refreshCatalog();
+          });
+        },
         refreshCatalog: function () {
           var self = this;
           var api = pluginsApi();
@@ -229,8 +208,14 @@
           }
           this.loadingCatalog = true;
           this.error = '';
-          this.status = '正在拉取货架…';
-          Promise.resolve(api.fetchRegistry(this.mirror))
+          this.status = this.catalogLocalRoot() ? '正在读取本地货架…' : '正在拉取货架…';
+          Promise.resolve(
+            api.fetchRegistry({
+              mirror: this.mirror,
+              localDebug: this.localDebug,
+              localRoot: this.catalogLocalRoot(),
+            }),
+          )
             .then(function (result) {
               self.loadingCatalog = false;
               if (!result || !result.ok) {
@@ -240,7 +225,11 @@
                 return;
               }
               self.catalog = result.plugins || [];
-              self.status = self.catalog.length ? '货架已更新' : '货架是空的';
+              self.status = self.catalog.length
+                ? self.localDebug
+                  ? '本地货架已更新'
+                  : '货架已更新'
+                : '货架是空的';
               self.error = '';
             })
             .catch(function (err) {
@@ -251,12 +240,37 @@
             });
         },
         onSaveMirror: function () {
-          var self = this;
           this.mirror = sanitize(this.mirror, 300);
-          saveSettings({ mirror: this.mirror }).then(function () {
-            self.status = '已保存加速源';
-            self.refreshCatalog();
-          });
+          this.persistSettings('已保存加速源');
+        },
+        onToggleLocalDebug: function () {
+          this.localDebug = !this.localDebug;
+          this.persistSettings(this.localDebug ? '已开启本地调试' : '已关闭本地调试');
+        },
+        onLocalRootInput: function (e) {
+          this.localRoot = e && e.target ? e.target.value : '';
+        },
+        onPickLocalRoot: function () {
+          if (this.$refs.localRootInput) this.$refs.localRootInput.click();
+        },
+        onSaveLocalRoot: function () {
+          this.localRoot = sanitize(this.localRoot, 500);
+          this.persistSettings('已保存本地仓路径');
+        },
+        onLocalRootFolderChange: function (e) {
+          var files = e && e.target && e.target.files;
+          if (e && e.target) e.target.value = '';
+          if (!files || !files.length) return;
+          var api = pluginsApi();
+          var resolved = api.resolveLocalRoot && api.resolveLocalRoot(filePathOf(files[0]));
+          if (!resolved || !resolved.ok) {
+            this.error = (resolved && resolved.error) || '无法解析本地插件仓路径';
+            this.status = '';
+            return;
+          }
+          this.localRoot = resolved.root;
+          this.error = '';
+          this.persistSettings('已保存本地仓路径');
         },
         onPickZip: function () {
           if (this.$refs.zipInput) this.$refs.zipInput.click();
@@ -273,28 +287,6 @@
           var files = e && e.target && e.target.files;
           if (e && e.target) e.target.value = '';
           if (files && files.length) this.beginInspect(files[0]);
-        },
-        onDrop: function (e) {
-          var helper = dropHelper();
-          this.dragging = false;
-          if (helper) {
-            helper.acceptOsFileDrag(e);
-            var files = helper.filesFromDropEvent(e);
-            if (files[0]) this.beginInspect(files[0]);
-            return;
-          }
-          if (e && e.preventDefault) e.preventDefault();
-          var list = e && e.dataTransfer && e.dataTransfer.files;
-          if (list && list.length) this.beginInspect(list[0]);
-        },
-        onDragOver: function (e) {
-          var helper = dropHelper();
-          if (helper) helper.acceptOsFileDrag(e);
-          else if (e && e.preventDefault) e.preventDefault();
-          this.dragging = true;
-        },
-        onDragLeave: function () {
-          this.dragging = false;
         },
         beginInspect: function (file) {
           var self = this;
@@ -332,6 +324,8 @@
               id: item.id,
               mirror: this.mirror,
               clientVersion: clientVersion(),
+              localDebug: this.localDebug,
+              localRoot: this.catalogLocalRoot(),
             }),
           )
             .then(function (preview) {
@@ -357,7 +351,13 @@
           var self = this;
           if (!this.pending) return;
           this.status = '正在安装…';
-          Promise.resolve(installPending(this.pending, this.mirror)).then(function (result) {
+          Promise.resolve(
+            installPending(this.pending, {
+              mirror: this.mirror,
+              localDebug: this.localDebug,
+              localRoot: this.catalogLocalRoot(),
+            }),
+          ).then(function (result) {
             if (!result || !result.ok) {
               self.error = (result && result.error) || '安装失败';
               self.status = '';
@@ -423,6 +423,60 @@
               this.loadingCatalog ? '拉取中…' : '刷新货架',
             ),
           ]),
+          h('div', { class: 'cell-title' }, '本地调试'),
+          h(
+            'div',
+            {
+              class: 'row bhchat-row-click',
+              on: { click: this.onToggleLocalDebug },
+            },
+            [
+              h('span', '从本地仓读取货架'),
+              h('span', { class: { 'bhchat-switch': true, on: !!this.localDebug } }, [
+                h('span', { class: 'bhchat-switch-core' }),
+              ]),
+            ],
+          ),
+          h('input', {
+            class: 'bhchat-input',
+            attrs: {
+              type: 'text',
+              placeholder: '本地插件仓绝对路径',
+              value: this.localRoot,
+            },
+            on: { input: this.onLocalRootInput },
+          }),
+          h('div', { class: 'bhchat-actions' }, [
+            h(
+              'button',
+              {
+                class: 'bhchat-btn bhchat-btn-secondary',
+                attrs: { type: 'button' },
+                on: { click: this.onPickLocalRoot },
+              },
+              '选择目录',
+            ),
+            h(
+              'button',
+              {
+                class: 'bhchat-btn bhchat-btn-secondary',
+                attrs: { type: 'button', disabled: this.loadingCatalog ? 'disabled' : undefined },
+                on: { click: this.onSaveLocalRoot },
+              },
+              '保存本地路径',
+            ),
+          ]),
+          h('input', {
+            ref: 'localRootInput',
+            class: 'bhchat-file-hidden',
+            attrs: {
+              type: 'file',
+              webkitdirectory: 'webkitdirectory',
+              directory: 'directory',
+              multiple: 'multiple',
+            },
+            on: { change: this.onLocalRootFolderChange },
+          }),
         ];
         var catalogRows = this.catalog.map(function (item) {
           var local = installed[item.id];
@@ -461,22 +515,6 @@
           ),
         );
         children.push(h('div', { class: 'cell-title' }, '本地安装'));
-        children.push(
-          h(
-            'div',
-            {
-              ref: 'dropzone',
-              class: { 'bhchat-dropzone': true, 'is-dragging': this.dragging },
-              on: {
-                dragenter: this.onDragOver,
-                dragover: this.onDragOver,
-                dragleave: this.onDragLeave,
-                drop: this.onDrop,
-              },
-            },
-            '拖入 zip 或插件文件夹',
-          ),
-        );
         children.push(
           h('div', { class: 'bhchat-actions' }, [
             h(
@@ -609,8 +647,6 @@
     if (!window.BHChat || !window.BHChat.injectCSS) return;
     window.BHChat.injectCSS(
       [
-        '.betterheyboxchat-setting-block .bhchat-dropzone{margin:8px 0;padding:18px 12px;border:1px dashed var(--opacity-2,rgba(255,255,255,.18));border-radius:8px;text-align:center;color:var(--text-3,#8b8e93);font-size:13px;-webkit-app-region:no-drag;app-region:no-drag}',
-        '.betterheyboxchat-setting-block .bhchat-dropzone.is-dragging{border-color:var(--brand-text,#7dd95e);color:var(--text-1,#f2f3f5)}',
         '.betterheyboxchat-setting-block .bhchat-confirm{margin:10px 0;padding:10px 12px;border-radius:8px;background:var(--opacity-1,rgba(0,0,0,.2))}',
         '.betterheyboxchat-setting-block .bhchat-confirm-row{display:flex;justify-content:space-between;gap:12px;font-size:13px;line-height:22px}',
         '.betterheyboxchat-setting-block .bhchat-confirm-desc{margin:8px 0;font-size:13px;line-height:20px;color:var(--text-2,#c7c8cc);white-space:pre-wrap;word-break:break-word}',

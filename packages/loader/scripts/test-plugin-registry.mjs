@@ -187,4 +187,123 @@ assert(
   '安装后应出现在用户插件列表',
 );
 
-console.log('OK: plugin-registry parse / mirror / remote inspect+install');
+function writeLocalRepo(root) {
+  fs.mkdirSync(path.join(root, 'hello-local'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'registry.json'),
+    JSON.stringify({
+      version: 1,
+      plugins: [
+        {
+          id: 'hello-local',
+          name: 'Hello Local',
+          version: '2.0.0',
+          author: 'AwCat',
+          desc: '本地示例',
+          minClientVersion: '1.56.0',
+        },
+      ],
+    }),
+  );
+  fs.writeFileSync(
+    path.join(root, 'hello-local', 'manifest.json'),
+    JSON.stringify({
+      id: 'hello-local',
+      name: 'Hello Local',
+      version: '2.0.0',
+      author: 'AwCat',
+      desc: '本地示例',
+      minClientVersion: '1.56.0',
+      entry: 'index.js',
+      style: 'style.css',
+      files: ['extra.txt'],
+    }),
+  );
+  fs.writeFileSync(path.join(root, 'hello-local', 'index.js'), 'void 0;');
+  fs.writeFileSync(path.join(root, 'hello-local', 'style.css'), '/* local */');
+  fs.writeFileSync(path.join(root, 'hello-local', 'extra.txt'), 'extra');
+}
+
+const localRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'bhchat-local-plugins-'));
+writeLocalRepo(localRepo);
+
+assert(typeof registry.resolveLocalRoot === 'function', '应导出 resolveLocalRoot');
+
+const emptyRoot = registry.resolveLocalRoot('');
+assert(!emptyRoot.ok, '空路径应失败');
+
+const relRoot = registry.resolveLocalRoot('BetterHeyboxChat-plugins');
+assert(!relRoot.ok, '相对路径应拒绝');
+
+const missing = registry.resolveLocalRoot(path.join(os.tmpdir(), 'bhchat-no-such-repo-' + Date.now()));
+assert(!missing.ok, '不存在的路径应失败');
+
+const noRegistryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bhchat-noreg-'));
+const noReg = registry.resolveLocalRoot(noRegistryDir);
+assert(!noReg.ok, '没有 registry.json 应失败');
+
+const okRoot = registry.resolveLocalRoot(localRepo);
+assert(okRoot.ok, '仓根路径应通过');
+assert(path.resolve(okRoot.root) === path.resolve(localRepo), '应解析到仓根');
+
+const nested = registry.resolveLocalRoot(path.join(localRepo, 'hello-local', 'index.js'));
+assert(nested.ok, '选中仓内文件应上溯到仓根');
+assert(path.resolve(nested.root) === path.resolve(localRepo), '上溯结果应是仓根');
+
+let fetchCalled = false;
+const localCatalog = await registry.fetchRegistry({
+  localRoot: localRepo,
+  fetch: function () {
+    fetchCalled = true;
+    return Promise.reject(new Error('不应访问网络'));
+  },
+});
+assert(localCatalog.ok && localCatalog.plugins[0].id === 'hello-local', 'localRoot 应读本地 registry.json');
+assert(!fetchCalled, '有 localRoot 时不应走 HTTP fetch');
+
+const badCatalog = await registry.fetchRegistry({
+  localRoot: noRegistryDir,
+  fetch: function () {
+    throw new Error('无效 localRoot 不应回落到网络');
+  },
+});
+assert(!badCatalog.ok, '无效 localRoot 应失败且不回落 GitHub');
+
+let emptyFetchCalled = false;
+const emptyLocal = await registry.fetchRegistry({
+  localDebug: true,
+  localRoot: '',
+  fetch: function () {
+    emptyFetchCalled = true;
+    return Promise.reject(new Error('不应访问网络'));
+  },
+});
+assert(!emptyLocal.ok, 'localDebug 开启但路径为空应失败');
+assert(!emptyFetchCalled, 'localDebug 开启时不应回落 GitHub');
+
+const localInspected = await registry.inspectRemote({
+  id: 'hello-local',
+  localRoot: localRepo,
+  clientVersion: '1.56.0',
+  fetch: function () {
+    throw new Error('inspect 有 localRoot 时不应访问网络');
+  },
+});
+assert(localInspected.ok, 'inspectRemote 应读本地插件: ' + (localInspected.error || ''));
+assert(localInspected.source === 'local', '本地检查来源应为 local');
+assert(localInspected.files['index.js'] || localInspected.files['hello-local/index.js'], '本地检查应包含入口文件');
+
+const tmpInstall = fs.mkdtempSync(path.join(os.tmpdir(), 'bhchat-local-install-'));
+process.env.BETTERHEYBOXCHAT_PROFILE = tmpInstall;
+const localInstalled = await store.installRemote({
+  id: 'hello-local',
+  localRoot: localRepo,
+  clientVersion: '1.56.0',
+});
+assert(localInstalled.ok, 'installRemote 应从本地仓写入用户目录: ' + (localInstalled.error || ''));
+assert(
+  fs.existsSync(path.join(tmpInstall, 'plugins', 'hello-local', 'index.js')),
+  '本地安装应复制入口文件到用户插件目录',
+);
+
+console.log('OK: plugin-registry parse / mirror / remote inspect+install / local debug');

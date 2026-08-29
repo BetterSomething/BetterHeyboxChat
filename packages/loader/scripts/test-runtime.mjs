@@ -423,15 +423,34 @@ const marketplaceSource = fs.readFileSync(
 );
 assert(/registerPanel/.test(marketplaceSource), '插件市场应挂到设置页');
 assert(/webkitdirectory/.test(marketplaceSource), '插件市场应支持选择文件夹');
-assert(/dragover|drop/.test(marketplaceSource), '插件市场应支持拖放安装');
-assert(/capture:\s*true/.test(marketplaceSource), '插件市场拖放应使用 capture 监听压过宿主拦截');
-assert(/BHChatOsFileDrop/.test(marketplaceSource), '插件市场应使用 os-file-drop 辅助');
+assert(/选择 zip/.test(marketplaceSource) && /选择文件夹/.test(marketplaceSource), '插件市场本地安装应保留选择 zip / 文件夹');
+assert(!/dragover|dragenter|dropzone|BHChatOsFileDrop/.test(marketplaceSource), '插件市场不应再提供 OS 拖放安装');
+assert(!/addEventListener\(['"]drop['"]/.test(marketplaceSource), '插件市场不应再监听 document drop');
 assert(/确认安装/.test(marketplaceSource), '安装前应二次确认');
 assert(!/innerHTML|v-html|domProps/.test(marketplaceSource), '确认框不得把插件字段当 HTML 插入');
 assert(/fetchRegistry/.test(marketplaceSource), '插件市场应拉取在线 registry.json');
 assert(/inspectRemote/.test(marketplaceSource) && /installRemote/.test(marketplaceSource), '插件市场应按需下载远程插件目录');
 assert(/刷新货架/.test(marketplaceSource), '插件市场应能刷新在线货架');
 assert(/加速源/.test(marketplaceSource), '插件市场应允许配置加速源前缀');
+assert(/本地调试/.test(marketplaceSource), '插件市场应提供本地调试开关');
+assert(/localDebug/.test(marketplaceSource) && /localRoot/.test(marketplaceSource), '本地调试开关和路径应写入设置');
+assert(/选择目录/.test(marketplaceSource), '本地仓路径应能选择目录');
+assert(/catalogLocalRoot/.test(marketplaceSource), '货架请求应通过 catalogLocalRoot 决定是否走本地仓');
+assert(/localRoot:\s*this\.catalogLocalRoot\(\)/.test(marketplaceSource), 'fetch/inspect/install 应传入 localRoot');
+assert(
+  /fetchRegistry\(\s*\{[\s\S]*?localDebug:\s*this\.localDebug/.test(marketplaceSource),
+  'fetchRegistry 应传入 localDebug，避免空路径回落 GitHub',
+);
+assert(
+  /inspectRemote\(\s*\{[\s\S]*?localDebug:\s*this\.localDebug/.test(marketplaceSource),
+  'inspectRemote 应传入 localDebug',
+);
+assert(
+  /installPending\([\s\S]*?localDebug:\s*this\.localDebug/.test(marketplaceSource),
+  'installRemote 应传入 localDebug',
+);
+assert(/bhchat-switch-core/.test(marketplaceSource), '本地调试应使用标准开关');
+assert(/resolveLocalRoot/.test(marketplaceSource), '选择目录后应解析到含 registry.json 的仓根');
 assert(!/默认从 GitHub/.test(marketplaceSource), '设置页不应再展示货架拉取说明');
 assert(!/还没有货架插件/.test(marketplaceSource), '设置页空货架不应再展示提示文案');
 assert(!/也可选择 zip/.test(marketplaceSource), '设置页本地安装不应再展示拖放说明');
@@ -439,7 +458,16 @@ assert(!/也可选择 zip/.test(marketplaceSource), '设置页本地安装不应
 const loaderSource2 = fs.readFileSync(path.resolve(__dirname, '../../../runtime/loader.js'), 'utf8');
 assert(/loadUserPlugins/.test(loaderSource2), 'loader 应加载用户目录插件');
 assert(/injectTextScript/.test(loaderSource2), '用户插件应通过文本注入而不是 file://');
-assert(/os-file-drop/.test(loaderSource2), 'loader 应在插件前加载 os-file-drop');
+assert(!/os-file-drop/.test(loaderSource2), 'loader 不应再加载已废弃的 os-file-drop');
+
+const preloadSource = fs.readFileSync(
+  path.resolve(__dirname, '../../../runtime/preload-bridge.js'),
+  'utf8',
+);
+assert(/getPathForFile/.test(preloadSource), 'preload 应为文件选择器保留 getPathForFile');
+assert(/getPathForFile/.test(runtimeSource), 'BHChat.plugins 应转发 getPathForFile');
+assert(/resolveLocalRoot/.test(preloadSource), 'preload 应暴露 resolveLocalRoot');
+assert(/resolveLocalRoot/.test(runtimeSource), 'BHChat.plugins 应转发 resolveLocalRoot');
 
 const installerUi = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/ui.rs'), 'utf8');
 const installerApp = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/app.rs'), 'utf8');

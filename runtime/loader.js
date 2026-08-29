@@ -7,7 +7,6 @@
 
   var RUNTIME_SCRIPT = '../betterheyboxchat/runtime.js';
   var STORAGE_SCRIPT = '../betterheyboxchat/lib/storage.js';
-  var FILE_DROP_SCRIPT = '../betterheyboxchat/lib/os-file-drop.js';
   var INDICATOR_SCRIPT = '../betterheyboxchat/indicator.js';
   var PLUGINS_MANIFEST = '../betterheyboxchat/plugins.json';
 
@@ -80,11 +79,6 @@
           window.__bhchat_bootstrap_patch__();
         }
         return loadScript(RUNTIME_SCRIPT);
-      })
-      .then(function () {
-        return loadScript(FILE_DROP_SCRIPT).catch(function (err) {
-          console.warn('[BetterHeyboxChat] os-file-drop load failed:', err);
-        });
       })
       .then(function () {
         if (!window.BHChat) {

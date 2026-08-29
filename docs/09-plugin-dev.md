@@ -58,6 +58,8 @@ BetterHeyboxChat-plugins/
 
 在 `registry.json` 的 `plugins` 数组加一行（id 与目录名相同），发 PR。客户端安装时再下载该目录的 `manifest.json`、`entry`、可选 `style` 与 `files`。
 
+调试未发布的货架插件：在设置页「插件市场 → 本地调试」打开开关，填入或选择本地插件仓根目录（须含 `registry.json`，路径可改）。刷新货架 / 安装 / 更新会读这个目录，仍复制到用户插件目录，**重启后生效**。关掉开关即回到在线货架。
+
 ## 最小插件
 
 ```javascript

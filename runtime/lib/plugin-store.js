@@ -243,6 +243,7 @@ module.exports = {
   uninstall: uninstall,
   readUserFile: readUserFile,
   fetchRegistry: registry.fetchRegistry,
+  resolveLocalRoot: registry.resolveLocalRoot,
   inspectRemote: inspectRemote,
   installRemote: installRemote,
 };
