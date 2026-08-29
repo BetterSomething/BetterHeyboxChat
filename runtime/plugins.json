@@ -56,7 +56,7 @@
   },
   {
     "id": "official-room-deco",
-    "name": "官方房间背景探测",
+    "name": "强制上传房间自定义背景",
     "version": "1.0.0",
     "author": "AwCat",
     "repository": "https://github.com/BetterSomething/BetterHeyboxChat",

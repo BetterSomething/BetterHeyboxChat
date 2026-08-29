@@ -389,18 +389,6 @@
             return forceUpload(self._file);
           }, '正在走官方上传 + decorate…');
         },
-        onProbeCurrent: function () {
-          this.run(function () {
-            return submitDecorate({});
-          }, '正在提交当前主题…');
-        },
-        onApplying: function () {
-          this.run(function () {
-            return fetchApplying().then(function (res) {
-              return { ok: true, applying: res && res.data ? res.data : res };
-            });
-          }, '正在查询审核状态…');
-        },
       },
       render: function (h) {
         var self = this;
@@ -423,11 +411,11 @@
           );
         }
         var children = [
-          h('div', { class: 'cell-title' }, '官方房间背景探测'),
+          h('div', { class: 'cell-title' }, '强制上传房间自定义背景'),
           h(
             'p',
             { class: 'bhchat-warn' },
-            '这是官方全员背景，不是本地 custom-room-bg。上传会忽略客户端 can_change_bg_pic，服务端仍可能拒绝。',
+            '使用存量接口上传，不保证一定可用，热门房间不可用',
           ),
         ];
         if (!snap.canSubmit) {
@@ -474,8 +462,6 @@
           ]),
           h('div', { class: 'bhchat-actions' }, [
             btn('强制上传并保存', 'primary', this.onForceUpload, !snap.canSubmit || this.pending),
-            btn('仅提交当前主题', 'secondary', this.onProbeCurrent, !snap.canSubmit || this.pending),
-            btn('查询审核状态', 'secondary', this.onApplying, !snap.canSubmit || this.pending),
           ]),
         );
         if (this.statusText) {
@@ -515,7 +501,7 @@
     if (!window.BHChat || !window.BHChat.registerPanel) return;
     window.BHChat.registerPanel({
       id: PLUGIN_ID,
-      title: '官方房间背景探测',
+      title: '强制上传房间自定义背景',
       component: buildPanelComponent(),
     });
   }

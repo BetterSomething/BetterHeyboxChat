@@ -138,13 +138,28 @@ assert(!/HELPERS_SRC/.test(pluginIndex), '探测插件不应再依赖 deco.js �
 assert(/textarea/.test(pluginIndex), '探测结果应使用 textarea 便于复制完整 payload');
 assert(!/location\.reload/.test(pluginIndex), '换背景后不得刷新整个前端');
 assert(!/window\.confirm/.test(pluginIndex), '不得使用原生 confirm（会打掉输入焦点）');
+assert(
+  /强制上传房间自定义背景/.test(pluginIndex),
+  '插件面板标题应为「强制上传房间自定义背景」',
+);
+assert(
+  /使用存量接口上传，不保证一定可用，热门房间不可用/.test(pluginIndex),
+  '应提示存量接口与热门房间限制',
+);
+assert(!/仅提交当前主题/.test(pluginIndex), '不应再提供「仅提交当前主题」');
+assert(!/查询审核状态/.test(pluginIndex), '不应再提供「查询审核状态」');
 
 const pluginsJson = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../../../runtime/plugins.json'), 'utf8'),
 );
 assert(
-  pluginsJson.some((p) => p.id === 'official-room-deco' && p.entry === 'index.js'),
-  'plugins.json 应注册 official-room-deco',
+  pluginsJson.some(
+    (p) =>
+      p.id === 'official-room-deco' &&
+      p.entry === 'index.js' &&
+      p.name === '强制上传房间自定义背景',
+  ),
+  'plugins.json 应注册 official-room-deco，显示名为「强制上传房间自定义背景」',
 );
 
 console.log('ok: official-room-deco payload bypasses client upload gate');
