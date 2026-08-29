@@ -215,33 +215,36 @@
       },
       render: function (h) {
         function rowSwitch(label, on, onClick) {
-          return h('div', { class: 'bhchat-list' }, [
-            h('div', { class: 'row' }, [
-              h('div', { class: 'bhchat-row-main' }, [h('div', { class: 'bhchat-row-title' }, label)]),
-              h(
-                'button',
-                {
-                  class: { 'bhchat-switch': true, on: on },
-                  attrs: { type: 'button', 'aria-checked': on ? 'true' : 'false' },
-                  on: { click: onClick },
-                },
-                [h('span', { class: 'bhchat-switch-knob' })],
-              ),
-            ]),
-          ]);
-        }
-        return h('div', { class: 'bhchat-block' }, [
-          rowSwitch('屏蔽完整客户端更新', this.blockClient, this.onToggleClient),
-          rowSwitch('屏蔽热更新', this.blockHotfix, this.onToggleHotfix),
-          h(
-            'button',
+          return h(
+            'div',
             {
-              class: { 'bhchat-btn': true, 'bhchat-btn-primary': true },
-              attrs: { type: 'button' },
-              on: { click: this.onEnsure },
+              class: 'row bhchat-row-click',
+              on: { click: onClick },
             },
-            '立即检查并修复补丁',
-          ),
+            [
+              h('span', label),
+              h('span', { class: { 'bhchat-switch': true, on: !!on } }, [
+                h('span', { class: 'bhchat-switch-core' }),
+              ]),
+            ],
+          );
+        }
+        return h('div', [
+          h('div', { class: 'bhchat-list' }, [
+            rowSwitch('屏蔽完整客户端更新', this.blockClient, this.onToggleClient),
+            rowSwitch('屏蔽热更新', this.blockHotfix, this.onToggleHotfix),
+          ]),
+          h('div', { class: 'bhchat-actions' }, [
+            h(
+              'button',
+              {
+                class: { 'bhchat-btn': true, 'bhchat-btn-primary': true },
+                attrs: { type: 'button' },
+                on: { click: this.onEnsure },
+              },
+              '立即检查并修复补丁',
+            ),
+          ]),
           h('div', { class: 'bhchat-hint' }, this.status || ''),
         ]);
       },

@@ -394,6 +394,9 @@ const blockSource = fs.readFileSync(
 );
 assert(/registerPanel/.test(blockSource), '屏蔽更新设置应通过 registerPanel 挂到设置页');
 assert(/bhchat-switch/.test(blockSource), '屏蔽更新应使用开关');
+assert(/bhchat-switch-core/.test(blockSource), '屏蔽更新开关须使用 bhchat-switch-core（宿主 CSS 只画这一层）');
+assert(!/bhchat-switch-knob/.test(blockSource), '屏蔽更新不得使用无样式的 bhchat-switch-knob');
+assert(/bhchat-row-click/.test(blockSource), '屏蔽更新开关行应可整行点击');
 assert(/updateClient/.test(blockSource) && /updateAsarResource/.test(blockSource), '屏蔽更新应钩官方 electronAPI 更新方法');
 assert(/setAsarVersion/.test(blockSource), '屏蔽更新应拦截切换 asar 版本');
 assert(/updateBlock/.test(blockSource), '屏蔽更新应把开关写到 preload/main-bridge 可读的标记');
