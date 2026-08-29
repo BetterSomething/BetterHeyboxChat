@@ -371,6 +371,15 @@
       inspectFolderPath: function (p) {
         return callPluginStore('inspectFolderPath', p);
       },
+      getPathForFile: function (file) {
+        var api = window.bhchatPreload && window.bhchatPreload.plugins;
+        if (!api || typeof api.getPathForFile !== 'function') return '';
+        try {
+          return api.getPathForFile(file) || '';
+        } catch (err) {
+          return '';
+        }
+      },
       installZipPath: function (p) {
         return callPluginStore('installZipPath', p);
       },

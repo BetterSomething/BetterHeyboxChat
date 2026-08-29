@@ -11,7 +11,7 @@
     "build": "tsc && node scripts/copy-runtime.mjs",
     "dev": "tsc --watch",
     "start": "node dist/cli.js",
-    "test:patch": "pnpm build && node scripts/test-plugin-package.mjs && node scripts/test-plugin-registry.mjs && node scripts/test-official-room-deco.mjs && node scripts/test-patch.mjs && node scripts/test-webpack-hook.mjs && node scripts/test-main-bridge.mjs && node scripts/test-runtime.mjs && node scripts/test-detect.mjs && node scripts/test-patch-guard.mjs && node scripts/test-indicator.mjs"
+    "test:patch": "pnpm build && node scripts/test-plugin-package.mjs && node scripts/test-plugin-registry.mjs && node scripts/test-official-room-deco.mjs && node scripts/test-patch.mjs && node scripts/test-webpack-hook.mjs && node scripts/test-main-bridge.mjs && node scripts/test-runtime.mjs && node scripts/test-os-file-drop.mjs && node scripts/test-detect.mjs && node scripts/test-patch-guard.mjs && node scripts/test-indicator.mjs"
   },
   "dependencies": {
     "commander": "^13.1.0"

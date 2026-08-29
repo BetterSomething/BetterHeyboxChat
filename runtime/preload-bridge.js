@@ -115,6 +115,18 @@
       inspectFolderPath: function (p) {
         return pluginStore.inspectFolderPath(p);
       },
+      getPathForFile: function (file) {
+        if (file && file.path) return file.path;
+        try {
+          var webUtils = require('electron').webUtils;
+          if (webUtils && typeof webUtils.getPathForFile === 'function') {
+            return webUtils.getPathForFile(file) || '';
+          }
+        } catch (err) {
+          /* 旧版 Electron 没有 webUtils */
+        }
+        return '';
+      },
       installZipPath: function (p) {
         return pluginStore.installZipPath(p);
       },

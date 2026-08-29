@@ -424,16 +424,22 @@ const marketplaceSource = fs.readFileSync(
 assert(/registerPanel/.test(marketplaceSource), '插件市场应挂到设置页');
 assert(/webkitdirectory/.test(marketplaceSource), '插件市场应支持选择文件夹');
 assert(/dragover|drop/.test(marketplaceSource), '插件市场应支持拖放安装');
+assert(/capture:\s*true/.test(marketplaceSource), '插件市场拖放应使用 capture 监听压过宿主拦截');
+assert(/BHChatOsFileDrop/.test(marketplaceSource), '插件市场应使用 os-file-drop 辅助');
 assert(/确认安装/.test(marketplaceSource), '安装前应二次确认');
 assert(!/innerHTML|v-html|domProps/.test(marketplaceSource), '确认框不得把插件字段当 HTML 插入');
 assert(/fetchRegistry/.test(marketplaceSource), '插件市场应拉取在线 registry.json');
 assert(/inspectRemote/.test(marketplaceSource) && /installRemote/.test(marketplaceSource), '插件市场应按需下载远程插件目录');
 assert(/刷新货架/.test(marketplaceSource), '插件市场应能刷新在线货架');
 assert(/加速源/.test(marketplaceSource), '插件市场应允许配置加速源前缀');
+assert(!/默认从 GitHub/.test(marketplaceSource), '设置页不应再展示货架拉取说明');
+assert(!/还没有货架插件/.test(marketplaceSource), '设置页空货架不应再展示提示文案');
+assert(!/也可选择 zip/.test(marketplaceSource), '设置页本地安装不应再展示拖放说明');
 
 const loaderSource2 = fs.readFileSync(path.resolve(__dirname, '../../../runtime/loader.js'), 'utf8');
 assert(/loadUserPlugins/.test(loaderSource2), 'loader 应加载用户目录插件');
 assert(/injectTextScript/.test(loaderSource2), '用户插件应通过文本注入而不是 file://');
+assert(/os-file-drop/.test(loaderSource2), 'loader 应在插件前加载 os-file-drop');
 
 const installerUi = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/ui.rs'), 'utf8');
 const installerApp = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/app.rs'), 'utf8');

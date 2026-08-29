@@ -40,6 +40,28 @@
     return false;
   }
 
+  function dropHelper() {
+    return window.BHChatOsFileDrop || null;
+  }
+
+  function filePathOf(file) {
+    var helper = dropHelper();
+    var getter = function (f) {
+      var api = pluginsApi();
+      if (!api.getPathForFile) return '';
+      try {
+        var resolved = api.getPathForFile(f);
+        return typeof resolved === 'string' ? resolved : '';
+      } catch (err) {
+        return '';
+      }
+    };
+    if (helper && helper.resolveDroppedPath) {
+      return helper.resolveDroppedPath(file, getter);
+    }
+    return getter(file) || (file && file.path) || '';
+  }
+
   function isZipFile(file) {
     return !!(file && /\.zip$/i.test(file.name || file.path || ''));
   }
@@ -59,10 +81,11 @@
 
   function inspectAndPending(file) {
     var api = pluginsApi();
-    if (isZipFile(file) && file.path && api.inspectZipPath) {
+    var osPath = filePathOf(file);
+    if (isZipFile(file) && osPath && api.inspectZipPath) {
       return Promise.resolve({
-        preview: api.inspectZipPath(file.path),
-        zipPath: file.path,
+        preview: api.inspectZipPath(osPath),
+        zipPath: osPath,
       });
     }
     if (isZipFile(file) && api.inspectZipBuffer) {
@@ -73,10 +96,10 @@
         };
       });
     }
-    if (file && file.path && api.inspectFolderPath) {
+    if (osPath && api.inspectFolderPath) {
       return Promise.resolve({
-        preview: api.inspectFolderPath(file.path),
-        folderPath: file.path,
+        preview: api.inspectFolderPath(osPath),
+        folderPath: osPath,
       });
     }
     return Promise.resolve({
@@ -142,6 +165,46 @@
           self.mirror = settings.mirror || '';
           self.refreshCatalog();
         });
+      },
+      mounted: function () {
+        var self = this;
+        var helper = dropHelper();
+        if (!helper) return;
+        this._onOsDragOver = function (e) {
+          if (!helper.isOsFileDrag(e)) return;
+          if (!helper.eventInside(self.$el, e)) return;
+          helper.acceptOsFileDrag(e);
+          self.dragging = helper.eventInside(self.$refs.dropzone, e);
+        };
+        this._onOsDragLeave = function (e) {
+          if (!helper.eventInside(self.$refs.dropzone, e)) self.dragging = false;
+        };
+        this._onOsDrop = function (e) {
+          if (!helper.isOsFileDrag(e)) return;
+          if (!helper.eventInside(self.$el, e)) return;
+          helper.acceptOsFileDrag(e);
+          self.dragging = false;
+          var files = helper.filesFromDropEvent(e);
+          if (files[0]) self.beginInspect(files[0]);
+        };
+        var opts = { capture: true };
+        document.addEventListener('dragenter', this._onOsDragOver, opts);
+        document.addEventListener('dragover', this._onOsDragOver, opts);
+        document.addEventListener('dragleave', this._onOsDragLeave, opts);
+        document.addEventListener('drop', this._onOsDrop, opts);
+      },
+      beforeDestroy: function () {
+        var opts = { capture: true };
+        if (this._onOsDragOver) {
+          document.removeEventListener('dragenter', this._onOsDragOver, opts);
+          document.removeEventListener('dragover', this._onOsDragOver, opts);
+        }
+        if (this._onOsDragLeave) {
+          document.removeEventListener('dragleave', this._onOsDragLeave, opts);
+        }
+        if (this._onOsDrop) {
+          document.removeEventListener('drop', this._onOsDrop, opts);
+        }
       },
       methods: {
         refreshUserPlugins: function () {
@@ -212,13 +275,22 @@
           if (files && files.length) this.beginInspect(files[0]);
         },
         onDrop: function (e) {
+          var helper = dropHelper();
           this.dragging = false;
+          if (helper) {
+            helper.acceptOsFileDrag(e);
+            var files = helper.filesFromDropEvent(e);
+            if (files[0]) this.beginInspect(files[0]);
+            return;
+          }
           if (e && e.preventDefault) e.preventDefault();
-          var files = e && e.dataTransfer && e.dataTransfer.files;
-          if (files && files.length) this.beginInspect(files[0]);
+          var list = e && e.dataTransfer && e.dataTransfer.files;
+          if (list && list.length) this.beginInspect(list[0]);
         },
         onDragOver: function (e) {
-          if (e && e.preventDefault) e.preventDefault();
+          var helper = dropHelper();
+          if (helper) helper.acceptOsFileDrag(e);
+          else if (e && e.preventDefault) e.preventDefault();
           this.dragging = true;
         },
         onDragLeave: function () {
@@ -322,11 +394,6 @@
         var installed = this.installedMap();
         var children = [
           h('div', { class: 'cell-title' }, '在线货架'),
-          h(
-            'p',
-            { class: 'bhchat-hint' },
-            '默认从 GitHub BetterHeyboxChat-plugins 拉 registry.json。加速源填完整 https 前缀，空则用官方 raw。',
-          ),
           h('input', {
             class: 'bhchat-input',
             attrs: {
@@ -390,23 +457,18 @@
           h(
             'div',
             { class: 'bhchat-list' },
-            catalogRows.length ? catalogRows : [h('p', { class: 'bhchat-hint' }, '还没有货架插件，点刷新或检查加速源。')],
+            catalogRows,
           ),
         );
         children.push(h('div', { class: 'cell-title' }, '本地安装'));
         children.push(
           h(
-            'p',
-            { class: 'bhchat-hint' },
-            '也可选择 zip、选择文件夹，或把 zip/文件夹拖进下面区域。',
-          ),
-        );
-        children.push(
-          h(
             'div',
             {
+              ref: 'dropzone',
               class: { 'bhchat-dropzone': true, 'is-dragging': this.dragging },
               on: {
+                dragenter: this.onDragOver,
                 dragover: this.onDragOver,
                 dragleave: this.onDragLeave,
                 drop: this.onDrop,
@@ -547,7 +609,7 @@
     if (!window.BHChat || !window.BHChat.injectCSS) return;
     window.BHChat.injectCSS(
       [
-        '.betterheyboxchat-setting-block .bhchat-dropzone{margin:8px 0;padding:18px 12px;border:1px dashed var(--opacity-2,rgba(255,255,255,.18));border-radius:8px;text-align:center;color:var(--text-3,#8b8e93);font-size:13px}',
+        '.betterheyboxchat-setting-block .bhchat-dropzone{margin:8px 0;padding:18px 12px;border:1px dashed var(--opacity-2,rgba(255,255,255,.18));border-radius:8px;text-align:center;color:var(--text-3,#8b8e93);font-size:13px;-webkit-app-region:no-drag;app-region:no-drag}',
         '.betterheyboxchat-setting-block .bhchat-dropzone.is-dragging{border-color:var(--brand-text,#7dd95e);color:var(--text-1,#f2f3f5)}',
         '.betterheyboxchat-setting-block .bhchat-confirm{margin:10px 0;padding:10px 12px;border-radius:8px;background:var(--opacity-1,rgba(0,0,0,.2))}',
         '.betterheyboxchat-setting-block .bhchat-confirm-row{display:flex;justify-content:space-between;gap:12px;font-size:13px;line-height:22px}',
