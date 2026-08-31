@@ -7,6 +7,10 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const officialPluginsRepo = path.resolve(__dirname, '../../../../BetterHeyboxChat-plugins');
+function officialPluginFile(id, rel) {
+  return path.join(officialPluginsRepo, id, rel);
+}
 const runtimeSource = fs.readFileSync(
   path.resolve(__dirname, '../../../runtime/runtime.js'),
   'utf8',
@@ -190,9 +194,10 @@ assert(
   'plugins.json 每项应有不超过 100 字的 desc',
 );
 assert(
-  pluginsJson.some((p) => p.id === 'marketplace' && p.entry === 'index.js'),
-  'plugins.json 应注册 marketplace',
+  pluginsJson.length === 1 && pluginsJson[0].id === 'marketplace' && pluginsJson[0].entry === 'index.js',
+  'plugins.json 只应内置 marketplace',
 );
+assert(fs.existsSync(path.join(officialPluginsRepo, 'registry.json')), '并列插件仓应有 registry.json');
 
 const ns = BHChat.storage.ns('demo');
 assert(ns && typeof ns.get === 'function' && typeof ns.set === 'function', 'storage.ns(pluginId) 应返回隔离存储');
@@ -224,10 +229,7 @@ assert(
   'loader 应按启用表跳过禁用插件',
 );
 
-const pluginSource = fs.readFileSync(
-  path.resolve(__dirname, '../../../runtime/plugins/custom-room-bg/index.js'),
-  'utf8',
-);
+const pluginSource = fs.readFileSync(officialPluginFile('custom-room-bg', 'index.js'), 'utf8');
 assert(!/setInterval\(\s*tick\s*,\s*800\s*\)/.test(pluginSource), '房间背景不应再 800ms 轮询');
 assert(/BHChat\.watch|this\.watch|\.watch\(/.test(pluginSource), '房间背景应使用 BHChat.watch');
 assert(/registerPanel/.test(pluginSource), '房间背景 UI 应通过 registerPanel 挂到设置页');
@@ -235,11 +237,14 @@ assert(/bhchat-btn-primary/.test(pluginSource), '房间背景保存应使用主�
 assert(/type:\s*'file'|accept:\s*'image/.test(pluginSource), '房间背景应支持从本地选择图片');
 assert(/fileToDataUrl|readAsDataURL|toDataURL/.test(pluginSource), '本地图片应转为可持久化的 data URL');
 assert(!/pointer-keyset/.test(pluginSource), '房间背景设置不应再用 pointer-keyset 充当按钮');
-
-const ttsSource = fs.readFileSync(
-  path.resolve(__dirname, '../../../runtime/plugins/channel-tts/index.js'),
-  'utf8',
+assert(!/injectStyleUrl/.test(pluginSource), '房间背景 CSS 应交 loader 按 manifest.style 注入');
+assert(
+  JSON.parse(fs.readFileSync(officialPluginFile('custom-room-bg', 'manifest.json'), 'utf8')).style ===
+    'style.css',
+  '房间背景 manifest 应声明 style.css',
 );
+
+const ttsSource = fs.readFileSync(officialPluginFile('channel-tts', 'index.js'), 'utf8');
 assert(/registerPanel/.test(ttsSource), 'TTS 设置应通过 registerPanel 挂到设置页');
 assert(/type:\s*'number'/.test(ttsSource), '语速应使用数字输入框');
 assert(!/不会读历史记录/.test(ttsSource), 'TTS 设置页不应再放说明长文');
@@ -251,18 +256,15 @@ assert(/channel_data/.test(ttsSource) && /cur_channel_data/.test(ttsSource), 'TT
 assert(!/__webpack_require__\(93509\)/.test(ttsSource), 'TTS 不应直接 require 设置模块');
 assert(!/'30570'|\"30570\"/.test(ttsSource), 'TTS 不应写死 EventBus 模块 ID');
 
-const pluginsManifest = JSON.parse(
-  fs.readFileSync(path.resolve(__dirname, '../../../runtime/plugins.json'), 'utf8'),
+const officialRegistry = JSON.parse(
+  fs.readFileSync(path.join(officialPluginsRepo, 'registry.json'), 'utf8'),
 );
-assert(
-  pluginsManifest.some((p) => p.id === 'channel-tts' && p.entry === 'index.js'),
-  'plugins.json 应注册 channel-tts',
-);
+function registryHas(id) {
+  return officialRegistry.plugins.some((p) => p.id === id);
+}
+assert(registryHas('channel-tts'), '插件仓 registry 应登记 channel-tts');
 
-const laughterSource = fs.readFileSync(
-  path.resolve(__dirname, '../../../runtime/plugins/laughter-fav-fix/index.js'),
-  'utf8',
-);
+const laughterSource = fs.readFileSync(officialPluginFile('laughter-fav-fix', 'index.js'), 'utf8');
 assert(/registerPanel/.test(laughterSource), '语音包收藏修复设置应通过 registerPanel 挂到设置页');
 assert(/bhchat-switch/.test(laughterSource) && /bhchat-btn-primary/.test(laughterSource), '语音包收藏修复应使用开关与主按钮');
 assert(!/pointer-keyset/.test(laughterSource), '语音包收藏修复不应再用 pointer-keyset 充当按钮');
@@ -279,10 +281,7 @@ assert(
 assert(/取消收藏/.test(laughterSource), '语音包收藏修复应覆盖取消收藏路径');
 assert(/bhchat-hint/.test(laughterSource), '语音包收藏修复设置页应展示刷新结果反馈');
 
-const danmakuSource = fs.readFileSync(
-  path.resolve(__dirname, '../../../runtime/plugins/screen-share-danmaku/index.js'),
-  'utf8',
-);
+const danmakuSource = fs.readFileSync(officialPluginFile('screen-share-danmaku', 'index.js'), 'utf8');
 assert(/registerPanel/.test(danmakuSource), '屏幕共享增强设置应通过 registerPanel 挂到设置页');
 assert(/bhchat-switch/.test(danmakuSource), '屏幕共享增强应使用开关');
 assert(!/pointer-keyset/.test(danmakuSource), '屏幕共享增强不应再用 pointer-keyset 充当按钮');
@@ -360,31 +359,23 @@ assert(
 );
 
 
+assert(registryHas('laughter-fav-fix'), '插件仓 registry 应登记 laughter-fav-fix');
+assert(registryHas('screen-share-danmaku'), '插件仓 registry 应登记 screen-share-danmaku');
+assert(registryHas('block-update'), '插件仓 registry 应登记 block-update');
+assert(registryHas('official-room-deco'), '插件仓 registry 应登记 official-room-deco');
+assert(registryHas('export-credentials'), '插件仓 registry 应登记 export-credentials');
+assert(registryHas('custom-room-bg'), '插件仓 registry 应登记 custom-room-bg');
+assert(registryHas('heybox-dev-mcp'), '插件仓 registry 应登记 heybox-dev-mcp');
+const devMcpSource = fs.readFileSync(officialPluginFile('heybox-dev-mcp', 'index.js'), 'utf8');
+assert(/127\.0\.0\.1/.test(devMcpSource), '开发桥必须只绑 127.0.0.1');
+assert(/heybox-dev-mcp\.json/.test(devMcpSource), '开发桥应写握手文件');
+assert(!/ELECTRON_ENV/.test(devMcpSource) || !/ELECTRON_ENV\s*=/.test(devMcpSource), '开发桥不得改 ELECTRON_ENV');
 assert(
-  pluginsManifest.some((p) => p.id === 'laughter-fav-fix' && p.entry === 'index.js'),
-  'plugins.json 应注册 laughter-fav-fix',
-);
-assert(
-  pluginsManifest.some((p) => p.id === 'screen-share-danmaku' && p.entry === 'index.js'),
-  'plugins.json 应注册 screen-share-danmaku',
-);
-assert(
-  pluginsManifest.some((p) => p.id === 'block-update' && p.entry === 'index.js'),
-  'plugins.json 应注册 block-update',
-);
-assert(
-  pluginsManifest.some((p) => p.id === 'official-room-deco' && p.entry === 'index.js'),
-  'plugins.json 应注册 official-room-deco',
-);
-assert(
-  pluginsManifest.some((p) => p.id === 'export-credentials' && p.entry === 'index.js'),
-  'plugins.json 应注册 export-credentials',
+  !officialRegistry.plugins.some((p) => p.id === 'marketplace'),
+  '插件仓不应再上架已内置的 marketplace',
 );
 
-const officialDecoSource = fs.readFileSync(
-  path.resolve(__dirname, '../../../runtime/plugins/official-room-deco/index.js'),
-  'utf8',
-);
+const officialDecoSource = fs.readFileSync(officialPluginFile('official-room-deco', 'index.js'), 'utf8');
 assert(/registerPanel/.test(officialDecoSource), '官方背景探测应通过 registerPanel 挂到设置页');
 assert(/room_deco_pic/.test(officialDecoSource), '官方背景探测换图应走 room_deco_pic');
 assert(/26737/.test(officialDecoSource) && /\.DC\b/.test(officialDecoSource), '官方背景探测应调用 26737.DC');
@@ -392,10 +383,7 @@ assert(!/canChangeBgPic\s*\(/.test(officialDecoSource), '官方背景探测不�
 assert(!/location\.reload/.test(officialDecoSource), '官方背景探测换背景后不得刷新整个前端');
 assert(!/window\.confirm/.test(officialDecoSource), '官方背景探测不得使用原生 confirm');
 
-const blockSource = fs.readFileSync(
-  path.resolve(__dirname, '../../../runtime/plugins/block-update/index.js'),
-  'utf8',
-);
+const blockSource = fs.readFileSync(officialPluginFile('block-update', 'index.js'), 'utf8');
 assert(/registerPanel/.test(blockSource), '屏蔽更新设置应通过 registerPanel 挂到设置页');
 assert(/bhchat-switch/.test(blockSource), '屏蔽更新应使用开关');
 assert(/bhchat-switch-core/.test(blockSource), '屏蔽更新开关须使用 bhchat-switch-core（宿主 CSS 只画这一层）');
@@ -416,6 +404,10 @@ assert(/wrapIpcMain/.test(mainBridgeSource), 'main-bridge 应拦截官方更新 
 const hookSource = fs.readFileSync(path.resolve(__dirname, '../../../runtime/webpack-hook.js'), 'utf8');
 assert(/listPanels|registerPanel/.test(hookSource), '设置页应渲染已注册 panel');
 assert(/立即重启|restart\(/.test(hookSource), '设置页应提供立即重启按钮');
+assert(/hBtn\(h, ['"]立即重启客户端['"], ['"]danger['"]/.test(hookSource), '设置页重启按钮应为红色危险样式');
+assert(/bhchat-dialog-mask/.test(hookSource), '设置页重启应使用独立遮罩确认框');
+assert(/确认重启客户端/.test(hookSource), '设置页重启应二次确认');
+assert(!/window\.confirm/.test(hookSource), '设置页不得使用原生 confirm');
 assert(/bhchat-btn-primary/.test(hookSource) && /bhchat-switch/.test(hookSource), '设置页应区分主按钮与开关样式');
 assert(!/pointer-keyset/.test(hookSource), '设置页不应再用 pointer-keyset 把按钮做成列表行');
 assert(/bhchat-row-desc/.test(hookSource), '设置页插件行应展示 desc');
@@ -431,6 +423,19 @@ assert(/选择 zip/.test(marketplaceSource) && /选择文件夹/.test(marketplac
 assert(!/dragover|dragenter|dropzone|BHChatOsFileDrop/.test(marketplaceSource), '插件市场不应再提供 OS 拖放安装');
 assert(!/addEventListener\(['"]drop['"]/.test(marketplaceSource), '插件市场不应再监听 document drop');
 assert(/确认安装/.test(marketplaceSource), '安装前应二次确认');
+assert(/mode:\s*['"]restart['"]/.test(marketplaceSource), '市场重启应走确认对话框');
+assert(/确认重启客户端/.test(marketplaceSource), '市场重启应二次确认');
+assert(
+  /class:\s*['"]bhchat-btn bhchat-btn-danger['"][\s\S]{0,200}立即重启客户端/.test(marketplaceSource),
+  '市场重启按钮应为红色危险样式',
+);
+assert(/bhchat-dialog-mask/.test(marketplaceSource), '安装确认应使用独立遮罩对话框');
+assert(/position:\s*fixed/.test(marketplaceSource), '确认对话框应脱离设置页流式布局');
+assert(/theme=light/.test(marketplaceSource), '对话框配色应按官方 theme=light 切换');
+assert(/--fill-1/.test(marketplaceSource) && /--text-1/.test(marketplaceSource), '对话框应使用官方 fill/text 变量');
+assert(/批量安装/.test(marketplaceSource), '货架应支持批量安装');
+assert(/批量删除/.test(marketplaceSource), '用户插件应支持批量删除');
+assert(!/window\.confirm/.test(marketplaceSource), '不得使用原生 confirm');
 assert(!/innerHTML|v-html|domProps/.test(marketplaceSource), '确认框不得把插件字段当 HTML 插入');
 assert(/fetchRegistry/.test(marketplaceSource), '插件市场应拉取在线 registry.json');
 assert(/inspectRemote/.test(marketplaceSource) && /installRemote/.test(marketplaceSource), '插件市场应按需下载远程插件目录');

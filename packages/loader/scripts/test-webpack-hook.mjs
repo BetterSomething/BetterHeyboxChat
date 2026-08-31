@@ -188,12 +188,16 @@ function createSettingCtx(overrides) {
       panels: [],
       activePanelId: '',
       restartStatus: '',
+      restartDialog: false,
       devToolsEnabled: true,
       devToolsStatus: '',
       indicatorVisible: true,
       frameworkVersion: '0.1.0',
       pendingRestart: false,
       onRestart() {},
+      onConfirmRestart() {},
+      onCancelRestart() {},
+      onRestartDialogMaskClick() {},
       onToggleDevTools() {},
       onOpenDevTools() {},
       onToggleIndicator() {},
@@ -260,6 +264,42 @@ const settingsButtons = findVnodes(
 );
 if (settingsButtons.length !== 1) {
   throw new Error('FAIL: 只有匹配 panel.id 的插件才显示「设置」，实际 ' + settingsButtons.length);
+}
+
+const restartButtons = findVnodes(
+  listTree,
+  (node) => node.tag === 'button' && collectTexts(node).includes('立即重启客户端'),
+);
+if (restartButtons.length !== 1) {
+  throw new Error('FAIL: 列表应有一个立即重启客户端按钮，实际 ' + restartButtons.length);
+}
+if (!restartButtons[0].data || !restartButtons[0].data.class || !restartButtons[0].data.class['bhchat-btn-danger']) {
+  throw new Error('FAIL: 立即重启客户端按钮应为红色危险样式');
+}
+if (listTexts.includes('确认重启客户端')) {
+  throw new Error('FAIL: 未点重启时不应出现确认框');
+}
+
+const dialogTree = setting.render.call(createSettingCtx({ restartDialog: true }), h);
+const dialogTexts = collectTexts(dialogTree);
+if (!dialogTexts.includes('确认重启客户端')) {
+  throw new Error('FAIL: 二次确认弹窗应显示标题');
+}
+if (!dialogTexts.includes('确认重启')) {
+  throw new Error('FAIL: 二次确认弹窗应有确认按钮');
+}
+if (!dialogTexts.includes('取消')) {
+  throw new Error('FAIL: 二次确认弹窗应有取消按钮');
+}
+const dialogMasks = findVnodes(
+  dialogTree,
+  (node) =>
+    node.data &&
+    (node.data.class === 'bhchat-dialog-mask' ||
+      (node.data.class && node.data.class['bhchat-dialog-mask'])),
+);
+if (!dialogMasks.length) {
+  throw new Error('FAIL: 重启确认应使用独立遮罩');
 }
 
 const detailTree = setting.render.call(

@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const pluginDir = path.resolve(__dirname, '../../../runtime/plugins/export-credentials');
+const officialPluginsRepo = path.resolve(__dirname, '../../../../BetterHeyboxChat-plugins');
+const pluginDir = path.join(officialPluginsRepo, 'export-credentials');
 const collectPath = path.join(pluginDir, 'collect.js');
 const indexPath = path.join(pluginDir, 'index.js');
 const manifestPath = path.join(pluginDir, 'manifest.json');
@@ -151,20 +152,32 @@ assert(/不要发给|不要把|仓库/.test(pluginIndex), '设置页必须警告
 assert(!/storage\.set|ns\(/.test(pluginIndex), '不得把凭据写入 BHChat.storage');
 assert(!/window\.confirm/.test(pluginIndex), '不得使用原生 confirm');
 assert(!/'30570'|\"30570\"/.test(pluginIndex), '不应写死 EventBus 模块 ID');
+assert(/readUserFile/.test(pluginIndex), 'collect.js 应从用户插件目录读取');
+assert(
+  !/betterheyboxchat\/plugins\/export-credentials/.test(pluginIndex),
+  '不得写死内置 collect.js 路径',
+);
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 assert(manifest.id === 'export-credentials', 'manifest.id 必须是 export-credentials');
 assert(manifest.name === '用户凭据导出', '显示名应为「用户凭据导出」');
 assert(typeof manifest.desc === 'string' && manifest.desc.length > 0 && manifest.desc.length <= 100, 'desc 不超过 100 字');
 
-const pluginsJson = JSON.parse(
+const bundled = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../../../runtime/plugins.json'), 'utf8'),
 );
 assert(
-  pluginsJson.some(
-    (p) => p.id === 'export-credentials' && p.entry === 'index.js' && p.name === '用户凭据导出',
-  ),
-  'plugins.json 应注册 export-credentials',
+  !bundled.some((p) => p.id === 'export-credentials'),
+  'export-credentials 不应再出现在内置 plugins.json',
+);
+const registry = JSON.parse(fs.readFileSync(path.join(officialPluginsRepo, 'registry.json'), 'utf8'));
+assert(
+  registry.plugins.some((p) => p.id === 'export-credentials' && p.name === '用户凭据导出'),
+  '插件仓 registry 应登记 export-credentials',
+);
+assert(
+  Array.isArray(manifest.files) && manifest.files.indexOf('collect.js') !== -1,
+  'export-credentials manifest.files 应包含 collect.js',
 );
 
 const mainBridge = fs.readFileSync(path.resolve(__dirname, '../../../runtime/main-bridge.js'), 'utf8');

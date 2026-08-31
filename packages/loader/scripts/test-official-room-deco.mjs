@@ -9,10 +9,9 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const decoPath = path.resolve(
-  __dirname,
-  '../../../runtime/plugins/official-room-deco/deco.js',
-);
+const officialPluginsRepo = path.resolve(__dirname, '../../../../BetterHeyboxChat-plugins');
+const pluginDir = path.join(officialPluginsRepo, 'official-room-deco');
+const decoPath = path.join(pluginDir, 'deco.js');
 
 function assert(cond, message) {
   if (!cond) throw new Error('FAIL: ' + message);
@@ -122,10 +121,7 @@ assert(
   '常规 PNG 应通过本地预检',
 );
 
-const pluginIndex = fs.readFileSync(
-  path.resolve(__dirname, '../../../runtime/plugins/official-room-deco/index.js'),
-  'utf8',
-);
+const pluginIndex = fs.readFileSync(path.join(pluginDir, 'index.js'), 'utf8');
 assert(/registerPanel/.test(pluginIndex), '探测插件应挂设置页');
 assert(/room\/decorate|DC\(/.test(pluginIndex), '探测插件应调用官方 decorate');
 assert(/room_deco_pic/.test(pluginIndex), '换图应走官方 uploadCustomFile source=room_deco_pic');
@@ -135,6 +131,7 @@ assert(
   '探测插件应内置 helpers，不能只靠二次加载 deco.js',
 );
 assert(!/HELPERS_SRC/.test(pluginIndex), '探测插件不应再依赖 deco.js 的 script src');
+assert(!/injectStyleUrl/.test(pluginIndex), '探测插件 CSS 应交 loader 按 manifest.style 注入');
 assert(/textarea/.test(pluginIndex), '探测结果应使用 textarea 便于复制完整 payload');
 assert(!/location\.reload/.test(pluginIndex), '换背景后不得刷新整个前端');
 assert(!/window\.confirm/.test(pluginIndex), '不得使用原生 confirm（会打掉输入焦点）');
@@ -149,17 +146,23 @@ assert(
 assert(!/仅提交当前主题/.test(pluginIndex), '不应再提供「仅提交当前主题」');
 assert(!/查询审核状态/.test(pluginIndex), '不应再提供「查询审核状态」');
 
-const pluginsJson = JSON.parse(
+const bundled = JSON.parse(
   fs.readFileSync(path.resolve(__dirname, '../../../runtime/plugins.json'), 'utf8'),
 );
 assert(
-  pluginsJson.some(
-    (p) =>
-      p.id === 'official-room-deco' &&
-      p.entry === 'index.js' &&
-      p.name === '强制上传房间自定义背景',
-  ),
-  'plugins.json 应注册 official-room-deco，显示名为「强制上传房间自定义背景」',
+  !bundled.some((p) => p.id === 'official-room-deco'),
+  'official-room-deco 不应再出现在内置 plugins.json',
+);
+const registry = JSON.parse(fs.readFileSync(path.join(officialPluginsRepo, 'registry.json'), 'utf8'));
+assert(
+  registry.plugins.some((p) => p.id === 'official-room-deco' && p.name === '强制上传房间自定义背景'),
+  '插件仓 registry 应登记 official-room-deco，显示名为「强制上传房间自定义背景」',
+);
+const decoManifest = JSON.parse(fs.readFileSync(path.join(pluginDir, 'manifest.json'), 'utf8'));
+assert(decoManifest.style === 'style.css', 'official-room-deco manifest 应声明 style.css');
+assert(
+  Array.isArray(decoManifest.files) && decoManifest.files.indexOf('deco.js') !== -1,
+  'official-room-deco manifest.files 应包含 deco.js',
 );
 
 console.log('ok: official-room-deco payload bypasses client upload gate');
