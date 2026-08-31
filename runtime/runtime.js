@@ -404,6 +404,15 @@
       installRemote: function (opts) {
         return callPluginStore('installRemote', opts);
       },
+      readUserFile: function (id, rel) {
+        var api = window.bhchatPreload && window.bhchatPreload.plugins;
+        if (!api || typeof api.readUserFile !== 'function') return '';
+        try {
+          return api.readUserFile(id, rel) || '';
+        } catch (err) {
+          return '';
+        }
+      },
     },
 
     electron: window.electronAPI,
