@@ -280,6 +280,53 @@ if (listTexts.includes('确认重启客户端')) {
   throw new Error('FAIL: 未点重启时不应出现确认框');
 }
 
+const marketplaceOnlyTip = '如果需要安装功能或卸载功能，请通过插件市场的设置进行操作';
+if (listTexts.includes(marketplaceOnlyTip)) {
+  throw new Error('FAIL: 已安装多个插件时不应显示市场空列表提示');
+}
+
+const marketplaceOnlyTree = setting.render.call(
+  createSettingCtx({
+    plugins: [
+      {
+        id: 'marketplace',
+        name: '插件市场',
+        version: '1.0.0',
+        author: 'AwCat',
+        repository: '',
+        desc: '',
+        enabled: true,
+        loaded: true,
+      },
+    ],
+  }),
+  h,
+);
+const marketplaceOnlyTexts = collectTexts(marketplaceOnlyTree);
+if (!marketplaceOnlyTexts.includes(marketplaceOnlyTip)) {
+  throw new Error('FAIL: 仅剩插件市场时应显示安装/卸载提示');
+}
+const marketplaceOnlyTips = findVnodes(
+  marketplaceOnlyTree,
+  (node) =>
+    node.data &&
+    (node.data.class === 'bhchat-admin-tip' ||
+      (node.data.class && node.data.class['bhchat-admin-tip'])),
+);
+if (marketplaceOnlyTips.length !== 1) {
+  throw new Error('FAIL: 仅剩插件市场时应有一条高级管理员配色提示，实际 ' + marketplaceOnlyTips.length);
+}
+
+const otherOnlyTree = setting.render.call(
+  createSettingCtx({
+    plugins: [pluginWithoutPanel],
+  }),
+  h,
+);
+if (collectTexts(otherOnlyTree).includes(marketplaceOnlyTip)) {
+  throw new Error('FAIL: 仅剩非市场插件时不应显示市场空列表提示');
+}
+
 const dialogTree = setting.render.call(createSettingCtx({ restartDialog: true }), h);
 const dialogTexts = collectTexts(dialogTree);
 if (!dialogTexts.includes('确认重启客户端')) {

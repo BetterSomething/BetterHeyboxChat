@@ -414,6 +414,12 @@ assert(/bhchat-btn-primary/.test(hookSource) && /bhchat-switch/.test(hookSource)
 assert(!/pointer-keyset/.test(hookSource), '设置页不应再用 pointer-keyset 把按钮做成列表行');
 assert(/bhchat-row-desc/.test(hookSource), '设置页插件行应展示 desc');
 assert(/safeHttpUrl/.test(hookSource), '仓库链接应经过 http(s) 校验');
+assert(/bhchat-admin-tip/.test(hookSource), '仅剩插件市场时应有高级管理员配色提示');
+assert(
+  /如果需要安装功能或卸载功能，请通过插件市场的设置进行操作/.test(hookSource),
+  '空列表提示文案应指向插件市场设置',
+);
+assert(/#ed286b/.test(hookSource) && /#e69e23/.test(hookSource), '提示配色应复用高级管理员粉橙渐变');
 
 const marketplaceSource = fs.readFileSync(
   path.resolve(__dirname, '../../../runtime/plugins/marketplace/index.js'),
@@ -427,6 +433,11 @@ assert(!/addEventListener\(['"]drop['"]/.test(marketplaceSource), '插件市场�
 assert(/确认安装/.test(marketplaceSource), '安装前应二次确认');
 assert(/mode:\s*['"]restart['"]/.test(marketplaceSource), '市场重启应走确认对话框');
 assert(/确认重启客户端/.test(marketplaceSource), '市场重启应二次确认');
+assert(/是否立即重启黑盒语音/.test(marketplaceSource), '安装完成后应询问是否立即重启黑盒语音');
+assert(
+  /afterInstall/.test(marketplaceSource) && /okIds\.length/.test(marketplaceSource),
+  '至少装成功一个插件后才应打开重启询问',
+);
 assert(
   /class:\s*['"]bhchat-btn bhchat-btn-danger['"][\s\S]{0,200}立即重启客户端/.test(marketplaceSource),
   '市场重启按钮应为红色危险样式',
@@ -443,6 +454,14 @@ assert(/fetchRegistry/.test(marketplaceSource), '插件市场应拉取在线 reg
 assert(/inspectRemote/.test(marketplaceSource) && /installRemote/.test(marketplaceSource), '插件市场应按需下载远程插件目录');
 assert(/刷新货架/.test(marketplaceSource), '插件市场应能刷新在线货架');
 assert(/加速源/.test(marketplaceSource), '插件市场应允许配置加速源前缀');
+assert(
+  /DEFAULT_MIRROR\s*=\s*['"]https:\/\/gh\.qmqaq\.top\/?['"]/.test(marketplaceSource),
+  '加速源默认应走 gh.qmqaq.top，避免国内直连 GitHub',
+);
+assert(
+  /saved\.mirror[\s\S]{0,80}DEFAULT_MIRROR/.test(marketplaceSource),
+  '未配置或空加速源应回落到默认镜像，而不是空字符串',
+);
 assert(/本地调试/.test(marketplaceSource), '插件市场应提供本地调试开关');
 assert(/localDebug/.test(marketplaceSource) && /localRoot/.test(marketplaceSource), '本地调试开关和路径应写入设置');
 assert(/选择目录/.test(marketplaceSource), '本地仓路径应能选择目录');
@@ -492,6 +511,18 @@ assert(/resolveLocalRoot/.test(runtimeSource), 'BHChat.plugins 应转发 resolve
 const installerUi = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/ui.rs'), 'utf8');
 const installerApp = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/app.rs'), 'utf8');
 const installerMain = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/main.rs'), 'utf8');
+const installerElevate = fs.readFileSync(
+  path.resolve(__dirname, '../../../installer/src/elevate.rs'),
+  'utf8',
+);
+assert(
+  /should_auto_elevate/.test(installerMain) && /request_admin_relaunch/.test(installerMain),
+  '安装器启动时非管理员应自动提权重启，不要等用户点按钮',
+);
+assert(
+  /ELEVATED_FLAG|--bhchat-elevated/.test(installerElevate),
+  '自动提权应带防循环标记，避免 UAC 成功后再次弹窗',
+);
 const installerDetect = fs.readFileSync(path.resolve(__dirname, '../../../installer/src/detect.rs'), 'utf8');
 assert(!/测试通道/.test(installerUi) && !/beta_channel/.test(installerUi) && !/beta_channel/.test(installerApp), '安装器应删除测试通道开关');
 assert(/确定/.test(installerUi), '指定路径输入后应有确定按钮');
