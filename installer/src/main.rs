@@ -38,6 +38,12 @@ fn run(renderer: eframe::Renderer) -> eframe::Result<()> {
 }
 
 fn main() -> eframe::Result<()> {
+    if elevate::should_auto_elevate(elevate::is_admin(), elevate::already_attempted_elevate()) {
+        if elevate::request_admin_relaunch() {
+            return Ok(());
+        }
+    }
+
     // Windows 上 glow/OpenGL 经常拿到 1.1 上下文（远程桌面、管理员会话、驱动异常），
     // egui_glow 会直接报 "requires opengl 2.0+"。优先走 wgpu（DX12/DX11）。
     match run(eframe::Renderer::Wgpu) {
