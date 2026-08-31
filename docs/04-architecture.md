@@ -91,7 +91,7 @@ runtime/plugins/
 
 ```javascript
 window.BHChat = {
-  version, clientVersion,
+  version, channel, commit, clientVersion,
   onReady, getVue, getStore, mapState, watch,
   on, off, emit,
   injectCSS, injectStyleUrl,

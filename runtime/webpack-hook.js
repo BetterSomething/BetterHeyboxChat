@@ -114,7 +114,7 @@
       },
       computed: {
         frameworkVersion: function () {
-          return (window.BHChat && window.BHChat.version) || '0.1.0';
+          return (window.BHChat && window.BHChat.version) || (typeof BHC_BUILD !== 'undefined' && BHC_BUILD && BHC_BUILD.version) || 'dev';
         },
         pendingRestart: function () {
           return this.plugins.some(function (plugin) {

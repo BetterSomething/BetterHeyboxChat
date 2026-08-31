@@ -1,4 +1,43 @@
-export const LOADER_VERSION = '0.1.0';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const FALLBACK_BUILD = { version: 'dev', channel: 'dev', commit: 'unknown' };
+
+function loadBuild(): { version: string; channel: string; commit: string } {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.resolve(here, '../runtime/version.json'),
+    path.resolve(here, '../../runtime/version.json'),
+    path.resolve(here, '../../../runtime/version.json'),
+  ];
+  for (const file of candidates) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+        version?: string;
+        channel?: string;
+        commit?: string;
+      };
+      if (parsed && parsed.version) {
+        return {
+          version: parsed.version,
+          channel: parsed.channel || 'dev',
+          commit: parsed.commit || 'unknown',
+        };
+      }
+    } catch {
+      /* 试下一个 */
+    }
+  }
+  return FALLBACK_BUILD;
+}
+
+const build = loadBuild();
+
+export const LOADER_VERSION = build.version;
+export const LOADER_CHANNEL = build.channel;
+export const LOADER_COMMIT = build.commit;
 
 export const MARKER_BEGIN = '// BetterHeyboxChat:begin';
 export const MARKER_END = '// BetterHeyboxChat:end';

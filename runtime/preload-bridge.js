@@ -89,9 +89,17 @@
   var pluginStore = require('./lib/plugin-store.js');
   var patchGuard = require('./lib/patch-guard.js');
   var APP_DIR = path.join(__dirname, '..');
+  var build = { version: 'dev', channel: 'dev', commit: 'unknown' };
+  try {
+    build = require('./lib/version.js');
+  } catch (err) {
+    /* 未跑 resolve-version 时保持 dev */
+  }
 
   window.bhchatPreload = {
-    version: '0.1.0',
+    version: build.version || 'dev',
+    channel: build.channel || 'dev',
+    commit: build.commit || 'unknown',
     ready: true,
     devtools: {
       isEnabled: isNativeDevToolsEnabled,

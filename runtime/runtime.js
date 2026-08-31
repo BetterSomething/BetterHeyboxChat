@@ -270,8 +270,15 @@
     return api[method](arg);
   }
 
+  var build =
+    typeof BHC_BUILD !== 'undefined' && BHC_BUILD
+      ? BHC_BUILD
+      : { version: 'dev', channel: 'dev', commit: 'unknown' };
+
   window.BHChat = {
-    version: '0.1.0',
+    version: build.version || 'dev',
+    channel: build.channel || 'dev',
+    commit: build.commit || 'unknown',
     clientVersion: window.asar_version || 'unknown',
 
     onReady: function (cb) {

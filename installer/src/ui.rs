@@ -1,5 +1,5 @@
 use crate::app::InstallerApp;
-use crate::constants::LOADER_VERSION;
+use crate::constants::{format_installer_label, LOADER_CHANNEL, LOADER_VERSION};
 use eframe::egui::{self, Color32, CornerRadius, Margin, RichText, Stroke, Vec2};
 
 const BG: Color32 = Color32::from_rgb(9, 9, 11);
@@ -65,7 +65,7 @@ fn render_content(app: &mut InstallerApp, ui: &mut egui::Ui, ctx: &egui::Context
             ui.label(RichText::new("BetterHeyboxChat").size(20.0).color(FG).strong());
             ui.add_space(2.0);
             ui.label(
-                RichText::new(format!("安装器  v{LOADER_VERSION}"))
+                RichText::new(format_installer_label(LOADER_VERSION, LOADER_CHANNEL))
                     .size(13.0)
                     .color(MUTED),
             );

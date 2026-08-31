@@ -8,6 +8,10 @@ dist/
 # pnpm build 从仓库根 runtime/ 复制出来的副本，不要手改
 packages/loader/runtime/
 
+# 构建时由 scripts/resolve-version.mjs 写入
+runtime/lib/version.js
+runtime/version.json
+
 # Rust
 installer/target/
 **/*.rs.bk

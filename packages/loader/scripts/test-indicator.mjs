@@ -146,6 +146,18 @@ assert(
   '文案应跟随 BHChat.version',
 );
 
+const sha = loadIndicator({ version: 'c357f16' });
+assert(
+  sha.dom.byId.get('bhchat-indicator').textContent === 'BHC c357f16',
+  'dev 短 SHA 不应再套一层 v，实际: ' + sha.dom.byId.get('bhchat-indicator').textContent,
+);
+
+const bare = loadIndicator({ withBhChat: false });
+assert(
+  bare.dom.byId.get('bhchat-indicator').textContent === 'BHC dev',
+  '没有 BHChat 时应回退 BHC dev，实际: ' + bare.dom.byId.get('bhchat-indicator').textContent,
+);
+
 const hidden = loadIndicator({ storedVisible: false });
 await flush();
 await flush();

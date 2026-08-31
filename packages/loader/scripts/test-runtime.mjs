@@ -124,6 +124,8 @@ function assert(cond, message) {
 const { BHChat, store, Vue, electronAPI } = loadRuntime({});
 
 assert(BHChat, 'runtime 未暴露 window.BHChat');
+assert(BHChat.version === 'dev', '未注入 BHC_BUILD 时应回退 dev');
+assert(BHChat.channel === 'dev', '未注入 BHC_BUILD 时 channel 应为 dev');
 assert(BHChat.getVue() === Vue, 'getVue() 应返回 #app.__vue__ 的构造函数');
 
 const mapped = BHChat.mapState(['cur_room_data', 'room_list']);

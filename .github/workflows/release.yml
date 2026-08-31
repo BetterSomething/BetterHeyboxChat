@@ -1,0 +1,79 @@
+name: Release installer
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semver without v prefix (e.g. 0.2.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: ver
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
+            $v = '${{ inputs.version }}'
+          } else {
+            $v = $env:GITHUB_REF_NAME
+            if ($v.StartsWith('v')) { $v = $v.Substring(1) }
+          }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') {
+            throw "invalid semver: $v"
+          }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "BHC_VERSION=$v" >> $env:GITHUB_ENV
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Write version files
+        id: buildinfo
+        shell: pwsh
+        run: |
+          $info = node scripts/resolve-version.mjs | ConvertFrom-Json
+          "artifact=$($info.artifact)" >> $env:GITHUB_OUTPUT
+
+      - name: Build installer
+        run: cargo build --release --manifest-path installer/Cargo.toml
+
+      - name: Stage artifact
+        env:
+          ARTIFACT: ${{ steps.buildinfo.outputs.artifact }}
+        shell: pwsh
+        run: Copy-Item installer/target/release/bhchat-installer.exe $env:ARTIFACT
+
+      - name: Release notes
+        run: node scripts/release-notes.mjs --out release-notes.md
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT: ${{ steps.buildinfo.outputs.artifact }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        shell: pwsh
+        run: |
+          gh release view "v$env:VERSION" 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release edit "v$env:VERSION" --notes-file release-notes.md
+            gh release upload "v$env:VERSION" $env:ARTIFACT --clobber
+          } else {
+            gh release create "v$env:VERSION" --title $env:VERSION --notes-file release-notes.md --target $env:GITHUB_SHA $env:ARTIFACT
+          }

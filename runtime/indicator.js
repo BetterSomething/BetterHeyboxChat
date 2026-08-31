@@ -8,9 +8,18 @@
   var STORAGE_KEY = 'bhchat.indicator.visible';
   var visible = true;
 
+  function resolveVersion() {
+    if (window.BHChat && window.BHChat.version) return window.BHChat.version;
+    if (typeof BHC_BUILD !== 'undefined' && BHC_BUILD && BHC_BUILD.version) return BHC_BUILD.version;
+    return 'dev';
+  }
+
+  function formatBadge(ver) {
+    return /^\d+\.\d+\.\d+/.test(ver) ? 'BHC v' + ver : 'BHC ' + ver;
+  }
+
   function versionLabel() {
-    var ver = (window.BHChat && window.BHChat.version) || '0.1.0';
-    return 'BHC v' + ver;
+    return formatBadge(resolveVersion());
   }
 
   function applyVisible() {
@@ -22,9 +31,9 @@
   function applyLabel() {
     var el = document.getElementById(INDICATOR_ID);
     if (!el) return;
-    var ver = (window.BHChat && window.BHChat.version) || '0.1.0';
+    var ver = resolveVersion();
     el.textContent = versionLabel();
-    el.title = 'BetterHeyboxChat v' + ver + ' 已加载';
+    el.title = 'BetterHeyboxChat ' + ver + ' 已加载';
   }
 
   function persistVisible() {

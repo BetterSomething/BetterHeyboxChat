@@ -5,6 +5,7 @@
 (function () {
   'use strict';
 
+  var VERSION_SCRIPT = '../betterheyboxchat/lib/version.js';
   var RUNTIME_SCRIPT = '../betterheyboxchat/runtime.js';
   var STORAGE_SCRIPT = '../betterheyboxchat/lib/storage.js';
   var INDICATOR_SCRIPT = '../betterheyboxchat/indicator.js';
@@ -70,7 +71,13 @@
       console.error('[BetterHeyboxChat] webpack hook missing — check patch order');
     }
 
-    loadScript(STORAGE_SCRIPT)
+    loadScript(VERSION_SCRIPT)
+      .catch(function () {
+        return null;
+      })
+      .then(function () {
+        return loadScript(STORAGE_SCRIPT);
+      })
       .then(function () {
         return loadScript(INDICATOR_SCRIPT);
       })

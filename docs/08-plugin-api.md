@@ -11,9 +11,11 @@
 
 | 属性 | 类型 | 说明 |
 | --- | --- | --- |
-| `BHChat.version` | `string` | 框架版本，当前 `0.1.0` |
+| `BHChat.version` | `string` | 框架版本。正式版为 `0.1.0` 这种 semver，开发版为短 SHA（如 `c357f16`） |
+| `BHChat.channel` | `'release' \| 'dev'` | 构建通道 |
+| `BHChat.commit` | `string` | 构建时的 git 短 SHA |
 | `BHChat.clientVersion` | `string` | `window.asar_version`，未知时为 `'unknown'` |
-| `BHChat.indicator.isVisible()` | `boolean` | 右下角 `BHC vx.x.x` 角标是否显示 |
+| `BHChat.indicator.isVisible()` | `boolean` | 右下角角标是否显示（正式版 `BHC v0.1.0`，开发版 `BHC c357f16`） |
 | `BHChat.indicator.setVisible(on)` | `Promise<{visible}>` | 显示/隐藏角标，写入 `bhchat.indicator.visible` |
 
 ## 生命周期
@@ -258,24 +260,6 @@ BHChat.officialRoomDeco.snapshot()
 BHChat.officialRoomDeco.upload(file)
 BHChat.officialRoomDeco.decorate(patch?)
 BHChat.officialRoomDeco.applying()
-```
-
-`screen-share-stream` 启用后挂载（探测只走 check / token；本机 MJPEG 看别人；`startOfficialShare` 才走官方开共享）：
-
-```javascript
-BHChat.screenShareStream.probe()
-BHChat.screenShareStream.getStatus()
-BHChat.screenShareStream.getLocalEndpoints()
-BHChat.screenShareStream.startRtmp()
-BHChat.screenShareStream.stopRtmp()
-BHChat.screenShareStream.startPlay()
-BHChat.screenShareStream.stopPlay()
-BHChat.screenShareStream.listSources()
-BHChat.screenShareStream.startOfficialShare(source)
-BHChat.screenShareStream.startObsPush()
-BHChat.screenShareStream.stopObsPush()
-BHChat.screenShareStream.getSettings()
-BHChat.screenShareStream.setSettings(patch)
 ```
 
 `export-credentials` 启用后挂载（从当前登录态收集官方 API query / Cookie，**不要**把结果写入仓库）：

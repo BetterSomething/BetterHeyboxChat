@@ -4,7 +4,7 @@
   "private": true,
   "description": "黑盒语音插件框架 — Loader 与运行时",
   "scripts": {
-    "build": "pnpm --filter @betterheyboxchat/loader build",
+    "build": "node scripts/resolve-version.mjs && pnpm --filter @betterheyboxchat/loader build",
     "dev": "pnpm --filter @betterheyboxchat/loader dev",
     "bhchat": "pnpm --filter @betterheyboxchat/loader start"
   },

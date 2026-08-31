@@ -198,15 +198,6 @@ BHChat.openSettings('betterheyboxchat');
 - 观众端只在官方 `screen_sharing_info.user_id`（正在观看）且 occupy 可见时挂弹幕；自己共享挂 `.cpt-screenshare-me-preview`；不挂到房间聊天主区。输入框挂官方 `.screen-share-operate`
 - 画中画时把弹幕合成进 PiP（Electron 走 canvas 流）；发送走官方发信通道，不伪造协议、不碰 RTC
 
-官方货架 `screen-share-stream`：
-
-- 共享者在 `cur_channel_data.members[].screen_share_info` / getter `screen_share_user_list`，不必先点「观看共享」
-- 探测只走 `52587.Wj`（check）+ `26737.IX`（token）；token 在 `result.res`（`api_type`/`app_id`），没有 HLS/RTMP
-- 看别人：火山 `23255` / TRTC `2597` 的 `startReceiveScreenCapture` 拉到隐藏容器，本机 `http://127.0.0.1:18080/watch.mjpg`
-- 自己开：FFmpeg `-listen` 收本机 RTMP，火山 `setVideoSourceType(屏幕,外部)` + `pushExternalVideoFrame`；仍走官方 `reportScreenShareRole`
-- 编码默认 1080p60，可改 480–2160 / 15–60；HTTP start 若拒绝则提示，不谎报档位
-- 仍可用官方窗口采集作回退；不 hook RTC 音频；密钥打码后才显示
-
 官方货架 `official-room-deco`：
 
 - 设置页探测官方全员房间背景写接口；忽略客户端 `can_change_bg_pic` / `room_decorate`
