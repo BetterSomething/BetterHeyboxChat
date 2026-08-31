@@ -465,6 +465,15 @@ assert(/resolveLocalRoot/.test(marketplaceSource), '选择目录后应解析到�
 assert(!/默认从 GitHub/.test(marketplaceSource), '设置页不应再展示货架拉取说明');
 assert(!/还没有货架插件/.test(marketplaceSource), '设置页空货架不应再展示提示文案');
 assert(!/也可选择 zip/.test(marketplaceSource), '设置页本地安装不应再展示拖放说明');
+assert(/bhchat-status/.test(marketplaceSource), '安装状态应使用醒目状态条，而不是弱提示');
+assert(/bhchat-progress/.test(marketplaceSource), '安装过程应展示进度条');
+assert(/bhchat-progress-bar/.test(marketplaceSource), '进度条应有填充宽度');
+assert(/progress:\s*null/.test(marketplaceSource), '市场应跟踪安装进度 current/total');
+assert(
+  /setProgress\(/.test(marketplaceSource) && /clearProgress\(/.test(marketplaceSource),
+  '读取与安装应通过 setProgress / clearProgress 更新进度',
+);
+assert(/bhchat-dialog-progress/.test(marketplaceSource), '确认安装对话框忙碌时应展示进度');
 
 const loaderSource2 = fs.readFileSync(path.resolve(__dirname, '../../../runtime/loader.js'), 'utf8');
 assert(/loadUserPlugins/.test(loaderSource2), 'loader 应加载用户目录插件');

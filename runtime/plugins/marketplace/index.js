@@ -174,6 +174,7 @@
           localDebug: false,
           localRoot: '',
           loadingCatalog: false,
+          progress: null,
         };
       },
       created: function () {
@@ -197,6 +198,52 @@
         if (this._onDialogKey) document.removeEventListener('keydown', this._onDialogKey);
       },
       methods: {
+        progressPercent: function () {
+          var p = this.progress;
+          if (!p || !p.total) return 0;
+          var pct = Math.round((Number(p.current) / Number(p.total)) * 100);
+          if (pct < 0) return 0;
+          if (pct > 100) return 100;
+          return pct;
+        },
+        setProgress: function (current, total, status) {
+          this.progress = { current: current || 0, total: total || 0 };
+          if (status != null) this.status = status;
+        },
+        clearProgress: function (status) {
+          this.progress = null;
+          if (arguments.length) this.status = status || '';
+        },
+        renderProgress: function (h) {
+          if (!this.progress || !this.progress.total) return null;
+          return h('div', { class: 'bhchat-progress' }, [
+            h('div', {
+              class: 'bhchat-progress-bar',
+              style: { width: this.progressPercent() + '%' },
+            }),
+          ]);
+        },
+        renderStatus: function (h) {
+          if (!this.status && !this.progress) return null;
+          var children = [];
+          if (this.status) children.push(h('p', { class: 'bhchat-status-text' }, this.status));
+          var bar = this.renderProgress(h);
+          if (bar) {
+            children.push(bar);
+            children.push(
+              h(
+                'div',
+                { class: 'bhchat-progress-meta' },
+                this.progress.current + ' / ' + this.progress.total,
+              ),
+            );
+          }
+          return h(
+            'div',
+            { class: { 'bhchat-status': true, 'bhchat-status-busy': !!(this.progress && this.progress.total) } },
+            children,
+          );
+        },
         refreshUserPlugins: function () {
           var list = (window.BHChat && window.BHChat.listPlugins && window.BHChat.listPlugins()) || [];
           this.userPlugins = list.filter(function (item) {
@@ -220,7 +267,7 @@
             localDebug: this.localDebug,
             localRoot: this.localRoot,
           }).then(function () {
-            self.status = status || '';
+            self.clearProgress(status || '');
             self.refreshCatalog();
           });
         },
@@ -233,7 +280,7 @@
           }
           this.loadingCatalog = true;
           this.error = '';
-          this.status = this.catalogLocalRoot() ? '正在读取本地货架…' : '正在拉取货架…';
+          this.clearProgress(this.catalogLocalRoot() ? '正在读取本地货架…' : '正在拉取货架…');
           Promise.resolve(
             api.fetchRegistry({
               mirror: this.mirror,
@@ -245,22 +292,24 @@
               self.loadingCatalog = false;
               if (!result || !result.ok) {
                 self.catalog = [];
-                self.status = '';
+                self.clearProgress('');
                 self.error = (result && result.error) || '拉取货架失败';
                 return;
               }
               self.catalog = result.plugins || [];
-              self.status = self.catalog.length
-                ? self.localDebug
-                  ? '本地货架已更新'
-                  : '货架已更新'
-                : '货架是空的';
+              self.clearProgress(
+                self.catalog.length
+                  ? self.localDebug
+                    ? '本地货架已更新'
+                    : '货架已更新'
+                  : '货架是空的',
+              );
               self.error = '';
             })
             .catch(function (err) {
               self.loadingCatalog = false;
               self.catalog = [];
-              self.status = '';
+              self.clearProgress('');
               self.error = (err && err.message) || '拉取货架失败';
             });
         },
@@ -290,7 +339,7 @@
           var resolved = api.resolveLocalRoot && api.resolveLocalRoot(filePathOf(files[0]));
           if (!resolved || !resolved.ok) {
             this.error = (resolved && resolved.error) || '无法解析本地插件仓路径';
-            this.status = '';
+            this.clearProgress('');
             return;
           }
           this.localRoot = resolved.root;
@@ -394,21 +443,21 @@
         beginInspect: function (file) {
           var self = this;
           this.error = '';
-          this.status = '正在读取插件信息…';
+          this.setProgress(0, 1, '正在读取插件信息…');
           inspectAndPending(file)
             .then(function (result) {
               var preview = result && result.preview;
               if (!preview || !preview.ok) {
-                self.status = '';
+                self.clearProgress('');
                 self.error = (preview && preview.error) || '无法解析插件包';
                 return;
               }
-              self.status = '';
+              self.clearProgress('');
               self.error = '';
               self.openInstallDialog([{ pending: result, preview: preview }]);
             })
             .catch(function (err) {
-              self.status = '';
+              self.clearProgress('');
               self.error = (err && err.message) || '读取失败';
             });
         },
@@ -420,10 +469,10 @@
             return;
           }
           this.error = '';
-          this.status = '正在读取 ' + item.id + '…';
+          this.setProgress(0, 1, '正在读取 ' + item.id + '…');
           this.inspectRemoteItem(item.id)
             .then(function (result) {
-              self.status = '';
+              self.clearProgress('');
               if (!result.ok) {
                 self.error = result.error || '无法下载插件';
                 return;
@@ -432,7 +481,7 @@
               self.openInstallDialog([result]);
             })
             .catch(function (err) {
-              self.status = '';
+              self.clearProgress('');
               self.error = (err && err.message) || '下载失败';
             });
         },
@@ -441,7 +490,7 @@
           var ids = this.selectedCatalogIds();
           if (!ids.length) {
             this.error = '请先勾选要安装的插件';
-            this.status = '';
+            this.clearProgress('');
             return;
           }
           var api = pluginsApi();
@@ -451,12 +500,17 @@
           }
           this.error = '';
           this.busy = true;
-          this.status = '正在读取已选插件…';
+          this.setProgress(0, ids.length, '正在读取已选插件… 0/' + ids.length);
           var items = [];
           var errors = [];
           var chain = Promise.resolve();
-          ids.forEach(function (id) {
+          ids.forEach(function (id, index) {
             chain = chain.then(function () {
+              self.setProgress(
+                index + 1,
+                ids.length,
+                '正在读取已选插件… ' + (index + 1) + '/' + ids.length + '：' + id,
+              );
               return self.inspectRemoteItem(id).then(function (result) {
                 if (result.ok) items.push(result);
                 else errors.push(id + '：' + (result.error || '失败'));
@@ -466,7 +520,7 @@
           chain
             .then(function () {
               self.busy = false;
-              self.status = '';
+              self.clearProgress('');
               if (!items.length) {
                 self.error = errors.join('；') || '无法下载插件';
                 return;
@@ -476,7 +530,7 @@
             })
             .catch(function (err) {
               self.busy = false;
-              self.status = '';
+              self.clearProgress('');
               self.error = (err && err.message) || '下载失败';
             });
         },
@@ -491,12 +545,19 @@
           var items = dialog.items || [];
           this.busy = true;
           this.error = '';
+          this.setProgress(0, items.length, '正在安装 0/' + items.length);
           var okIds = [];
           var errors = [];
           var chain = Promise.resolve();
           items.forEach(function (item, index) {
             chain = chain.then(function () {
-              self.status = '正在安装 ' + (index + 1) + '/' + items.length + '…';
+              var man = item.preview && item.preview.manifest;
+              var label = sanitize((man && man.name) || (man && man.id) || '插件', 40);
+              self.setProgress(
+                index + 1,
+                items.length,
+                '正在安装 ' + (index + 1) + '/' + items.length + '：' + label,
+              );
               return Promise.resolve(
                 installPending(item.pending, {
                   mirror: self.mirror,
@@ -517,13 +578,14 @@
             self.refreshUserPlugins();
             if (!okIds.length) {
               self.error = errors.length ? '安装失败：' + errors.join('、') : '安装失败';
-              self.status = '';
+              self.clearProgress('');
               return;
             }
             self.dialog = null;
             self.catalogSelected = {};
-            self.status =
-              '已安装 ' + okIds.join('、') + '，重启客户端后生效。' + (errors.length ? ' 失败：' + errors.join('、') : '');
+            self.clearProgress(
+              '已安装 ' + okIds.join('、') + '，重启客户端后生效。' + (errors.length ? ' 失败：' + errors.join('、') : ''),
+            );
             self.error = errors.length ? '部分插件安装失败：' + errors.join('、') : '';
           });
         },
@@ -547,13 +609,14 @@
           this.refreshUserPlugins();
           if (!okIds.length) {
             this.error = (errors.length ? '删除失败：' + errors.join('、') : '') || '卸载失败';
-            this.status = '';
+            this.clearProgress('');
             return;
           }
           this.dialog = null;
           this.userSelected = {};
-          this.status =
-            '已删除 ' + okIds.join('、') + '，重启客户端后生效。' + (errors.length ? ' 失败：' + errors.join('、') : '');
+          this.clearProgress(
+            '已删除 ' + okIds.join('、') + '，重启客户端后生效。' + (errors.length ? ' 失败：' + errors.join('、') : ''),
+          );
           this.error = errors.length ? '部分插件删除失败：' + errors.join('、') : '';
         },
         onUninstall: function (plugin) {
@@ -563,7 +626,7 @@
           var list = this.selectedUserPlugins();
           if (!list.length) {
             this.error = '请先勾选要删除的插件';
-            this.status = '';
+            this.clearProgress('');
             return;
           }
           this.error = '';
@@ -798,7 +861,8 @@
           }),
         );
         if (this.error) children.push(h('p', { class: 'bhchat-warn' }, this.error));
-        if (this.status) children.push(h('p', { class: 'bhchat-hint' }, this.status));
+        var statusNode = this.renderStatus(h);
+        if (statusNode) children.push(statusNode);
         children.push(h('div', { class: 'cell-title' }, '用户插件'));
         if (this.userPlugins.length) {
           children.push(
@@ -1016,6 +1080,26 @@
             : '确认安装'
           : '确认安装'
         : '确认删除';
+      if (this.busy && isInstall) {
+        var progressBar = this.renderProgress(h);
+        body.push(
+          h('div', { class: 'bhchat-dialog-progress' }, [
+            h('div', { class: 'bhchat-dialog-progress-text' }, this.status || '处理中…'),
+            progressBar,
+            this.progress
+              ? h(
+                  'div',
+                  { class: 'bhchat-progress-meta' },
+                  this.progress.current + ' / ' + this.progress.total,
+                )
+              : null,
+          ]),
+        );
+      }
+      var busyLabel =
+        this.busy && isInstall && this.progress
+          ? '安装中 ' + this.progress.current + '/' + this.progress.total
+          : '处理中…';
       return h(
         'div',
         { class: 'bhchat-dialog-mask', on: { click: this.onDialogMaskClick } },
@@ -1038,7 +1122,7 @@
                     attrs: { type: 'button', disabled: this.busy ? 'disabled' : undefined },
                     on: { click: isInstall ? this.onConfirmInstall : this.onConfirmUninstall },
                   },
-                  this.busy ? '处理中…' : confirmLabel,
+                  this.busy ? busyLabel : confirmLabel,
                 ),
                 h(
                   'button',
@@ -1081,6 +1165,21 @@
         '.bhchat-dialog-desc,.bhchat-dialog-item{margin:4px 0 0;font-size:13px;line-height:20px;color:var(--text-2,#d2d3d7);white-space:pre-wrap;word-break:break-word}',
         'html[theme=light] .bhchat-dialog-desc,html[theme=light] .bhchat-dialog-item,body[theme=light] .bhchat-dialog-desc,body[theme=light] .bhchat-dialog-item{color:var(--text-2,#32373c)}',
         '.bhchat-dialog-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:16px 0 0}',
+        '.betterheyboxchat-setting-block .bhchat-status{margin:8px 0;padding:10px 12px;border-radius:8px;background:var(--opacity-1,rgba(255,255,255,.06));border:1px solid var(--opacity-2,rgba(255,255,255,.12));box-sizing:border-box}',
+        'html[theme=light] .betterheyboxchat-setting-block .bhchat-status,body[theme=light] .betterheyboxchat-setting-block .bhchat-status{background:var(--opacity-1,#0000000a);border-color:var(--opacity-2,#00000014)}',
+        '.betterheyboxchat-setting-block .bhchat-status-busy{background:rgba(45,125,70,.18);border-color:var(--brand-fill,#2d7d46)}',
+        'html[theme=light] .betterheyboxchat-setting-block .bhchat-status-busy,body[theme=light] .betterheyboxchat-setting-block .bhchat-status-busy{background:rgba(45,125,70,.1)}',
+        '.betterheyboxchat-setting-block .bhchat-status-text{margin:0;font-size:13px;font-weight:700;line-height:20px;color:var(--text-1,#fff)}',
+        'html[theme=light] .betterheyboxchat-setting-block .bhchat-status-text,body[theme=light] .betterheyboxchat-setting-block .bhchat-status-text{color:var(--text-1,#000)}',
+        '.betterheyboxchat-setting-block .bhchat-progress,.bhchat-dialog .bhchat-progress{margin-top:8px;height:6px;border-radius:3px;overflow:hidden;background:var(--opacity-2,rgba(255,255,255,.14))}',
+        'html[theme=light] .betterheyboxchat-setting-block .bhchat-progress,html[theme=light] .bhchat-dialog .bhchat-progress,body[theme=light] .betterheyboxchat-setting-block .bhchat-progress,body[theme=light] .bhchat-dialog .bhchat-progress{background:var(--opacity-2,#00000014)}',
+        '.betterheyboxchat-setting-block .bhchat-progress-bar,.bhchat-dialog .bhchat-progress-bar{height:100%;border-radius:3px;background:var(--brand-text,#7dd95e);transition:width .2s ease}',
+        '.betterheyboxchat-setting-block .bhchat-progress-meta,.bhchat-dialog .bhchat-progress-meta{margin-top:6px;font-size:12px;line-height:16px;color:var(--text-2,#d2d3d7)}',
+        'html[theme=light] .betterheyboxchat-setting-block .bhchat-progress-meta,html[theme=light] .bhchat-dialog .bhchat-progress-meta,body[theme=light] .betterheyboxchat-setting-block .bhchat-progress-meta,body[theme=light] .bhchat-dialog .bhchat-progress-meta{color:var(--text-2,#32373c)}',
+        '.bhchat-dialog-progress{margin-top:10px;padding-top:10px;border-top:1px solid var(--opacity-2,rgba(255,255,255,.12))}',
+        'html[theme=light] .bhchat-dialog-progress,body[theme=light] .bhchat-dialog-progress{border-top-color:var(--opacity-2,#00000014)}',
+        '.bhchat-dialog-progress-text{margin:0 0 8px;font-size:13px;font-weight:700;line-height:20px;color:var(--text-1,#fff)}',
+        'html[theme=light] .bhchat-dialog-progress-text,body[theme=light] .bhchat-dialog-progress-text{color:var(--text-1,#000)}',
       ].join(''),
     );
   }
