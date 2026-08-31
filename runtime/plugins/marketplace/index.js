@@ -3,7 +3,7 @@
 
   var PLUGIN_ID = 'marketplace';
   var STORAGE_KEY = 'settings';
-  var DEFAULT_MIRROR = '';
+  var DEFAULT_MIRROR = 'https://gh.qmqaq.top/';
 
   function pluginsApi() {
     return (window.BHChat && window.BHChat.plugins) || {};
@@ -129,7 +129,7 @@
     return ns.get(STORAGE_KEY).then(function (saved) {
       saved = saved && typeof saved === 'object' ? saved : {};
       return {
-        mirror: typeof saved.mirror === 'string' ? saved.mirror.trim() : '',
+        mirror: typeof saved.mirror === 'string' && saved.mirror.trim() ? saved.mirror.trim() : DEFAULT_MIRROR,
         localDebug: !!saved.localDebug,
         localRoot: typeof saved.localRoot === 'string' ? saved.localRoot.trim() : '',
       };
@@ -140,7 +140,7 @@
     var ns = getNs();
     if (!ns) return Promise.resolve();
     return ns.set(STORAGE_KEY, {
-      mirror: (settings.mirror || '').trim(),
+      mirror: (settings.mirror || '').trim() || DEFAULT_MIRROR,
       localDebug: !!settings.localDebug,
       localRoot: (settings.localRoot || '').trim(),
     });
@@ -181,7 +181,7 @@
         var self = this;
         this.refreshUserPlugins();
         loadSettings().then(function (settings) {
-          self.mirror = settings.mirror || '';
+          self.mirror = settings.mirror || DEFAULT_MIRROR;
           self.localDebug = !!settings.localDebug;
           self.localRoot = settings.localRoot || '';
           self.refreshCatalog();
@@ -314,7 +314,7 @@
             });
         },
         onSaveMirror: function () {
-          this.mirror = sanitize(this.mirror, 300);
+          this.mirror = sanitize(this.mirror, 300) || DEFAULT_MIRROR;
           this.persistSettings('已保存加速源');
         },
         onToggleLocalDebug: function () {
@@ -666,7 +666,7 @@
             class: 'bhchat-input',
             attrs: {
               type: 'text',
-              placeholder: '加速源 URL 前缀（可选）',
+              placeholder: '加速源 URL 前缀（默认 https://gh.qmqaq.top/）',
               value: this.mirror,
             },
             on: { input: this.onMirrorInput },
