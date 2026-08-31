@@ -581,12 +581,12 @@
               self.clearProgress('');
               return;
             }
-            self.dialog = null;
             self.catalogSelected = {};
             self.clearProgress(
               '已安装 ' + okIds.join('、') + '，重启客户端后生效。' + (errors.length ? ' 失败：' + errors.join('、') : ''),
             );
             self.error = errors.length ? '部分插件安装失败：' + errors.join('、') : '';
+            self.dialog = { mode: 'restart', afterInstall: true, names: okIds };
           });
         },
         onConfirmUninstall: function () {
@@ -956,6 +956,14 @@
       var dialog = this.dialog;
       if (!dialog) return null;
       if (dialog.mode === 'restart') {
+        var afterInstall = !!dialog.afterInstall;
+        var installed = (dialog.names || []).map(function (id) {
+          return sanitize(id, 64);
+        }).filter(Boolean);
+        var restartDesc = afterInstall
+          ? (installed.length ? '已安装 ' + installed.join('、') + '，' : '插件已安装，') +
+            '重启后才会生效。是否立即重启黑盒语音？正在进行的通话或未保存的内容会中断。'
+          : '将立即重启黑盒语音。正在进行的通话或未保存的内容会中断。';
         return h(
           'div',
           { class: 'bhchat-dialog-mask', on: { click: this.onDialogMaskClick } },
@@ -964,13 +972,13 @@
               'div',
               { class: 'bhchat-dialog', on: { click: this.stopBubble } },
               [
-                h('div', { class: 'bhchat-dialog-title' }, '确认重启客户端'),
+                h(
+                  'div',
+                  { class: 'bhchat-dialog-title' },
+                  afterInstall ? '是否立即重启黑盒语音' : '确认重启客户端',
+                ),
                 h('div', { class: 'bhchat-dialog-body' }, [
-                  h(
-                    'div',
-                    { class: 'bhchat-dialog-desc' },
-                    '将立即重启黑盒语音。正在进行的通话或未保存的内容会中断。',
-                  ),
+                  h('div', { class: 'bhchat-dialog-desc' }, restartDesc),
                 ]),
                 h('div', { class: 'bhchat-dialog-actions' }, [
                   h(
@@ -980,7 +988,7 @@
                       attrs: { type: 'button' },
                       on: { click: this.onConfirmRestart },
                     },
-                    '确认重启',
+                    afterInstall ? '立即重启' : '确认重启',
                   ),
                   h(
                     'button',
@@ -989,7 +997,7 @@
                       attrs: { type: 'button' },
                       on: { click: this.onCancelDialog },
                     },
-                    '取消',
+                    afterInstall ? '稍后' : '取消',
                   ),
                 ]),
               ],
