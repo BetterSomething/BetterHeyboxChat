@@ -358,11 +358,24 @@
           });
         }
 
+        var onlyMarketplace =
+          this.plugins.length === 1 && this.plugins[0] && this.plugins[0].id === 'marketplace';
         var pluginChildren = [
           h('div', { class: 'cell-title' }, '已安装插件'),
           h('div', { class: 'bhchat-list' }, pluginRows),
-          h('div', { class: 'bhchat-actions' }, [hBtn(h, '立即重启客户端', 'danger', this.onRestart)]),
         ];
+        if (onlyMarketplace) {
+          pluginChildren.push(
+            h(
+              'p',
+              { class: 'bhchat-admin-tip' },
+              '如果需要安装功能或卸载功能，请通过插件市场的设置进行操作',
+            ),
+          );
+        }
+        pluginChildren.push(
+          h('div', { class: 'bhchat-actions' }, [hBtn(h, '立即重启客户端', 'danger', this.onRestart)]),
+        );
         if (this.pendingRestart) {
           pluginChildren.push(h('p', { class: 'bhchat-hint' }, '插件开关已更改，重启后生效。'));
         }
@@ -441,6 +454,7 @@
       '.betterheyboxchat-setting-block .bhchat-link{color:var(--brand-text,#7dd95e);text-decoration:none;cursor:pointer}',
       '.betterheyboxchat-setting-block .bhchat-link:hover{text-decoration:underline}',
       '.betterheyboxchat-setting-block .bhchat-hint{color:var(--text-3,#8b8e93);font-size:12px;line-height:20px;letter-spacing:.04em;margin:0 0 8px}',
+      '.betterheyboxchat-setting-block .bhchat-admin-tip{margin:8px 0 0;font-size:13px;font-weight:700;line-height:20px;background-image:linear-gradient(90deg,#ed286b 0%,#e69e23 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}',
       '.betterheyboxchat-setting-block .bhchat-hint+.bhchat-list,.betterheyboxchat-setting-block .cell-title+.bhchat-list{margin-top:0}',
       '.betterheyboxchat-setting-block .bhchat-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 0 4px}',
       '.betterheyboxchat-setting-block .bhchat-btn{appearance:none;-webkit-appearance:none;display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;border:none;border-radius:5px;font-family:inherit;font-size:14px;font-weight:700;line-height:18px;letter-spacing:.01em;cursor:pointer;user-select:none}',
