@@ -19,13 +19,15 @@ CLI：`pnpm build` 后 `pnpm bhchat install --yes`（需管理员；不会自动
 
 ## 目录与清单
 
-每个插件一份目录，并在 `runtime/plugins.json` 登记（loader 只读这份清单）：
+框架仓只内置 `runtime/plugins/marketplace/`。功能插件放独立仓 [BetterHeyboxChat-plugins](https://github.com/BetterSomething/BetterHeyboxChat-plugins)，用户从市场安装后落到数据目录。
+
+新插件不要写进 `runtime/plugins/` / `plugins.json`。目录结构：
 
 ```
-runtime/plugins/my-plugin/
+BetterHeyboxChat-plugins/your-plugin/
   manifest.json
   index.js
-  style.css          # 可选
+  style.css          # 可选，写进 manifest.style，由 loader 注入
 ```
 
 ```json
@@ -42,9 +44,9 @@ runtime/plugins/my-plugin/
 }
 ```
 
-`plugins.json` 里对应一项，字段保持一致。`id` 必须与目录名相同。`author`、`repository`、`desc` 会显示在设置页（仓库可点开）。`desc` 不超过 100 字，不要写 HTML。`enabled` 是默认值；用户可在设置里关掉，写入 `bhchat.plugins.enabled`，**重启后** loader 才跳过脚本。
+`id` 必须与目录名相同。`author`、`repository`、`desc` 会显示在设置页（仓库可点开）。`desc` 不超过 100 字，不要写 HTML。`enabled` 是默认值；用户可在设置里关掉，写入 `bhchat.plugins.enabled`，**重启后** loader 才跳过脚本。额外脚本写进 `files`，不要写死 `../betterheyboxchat/plugins/...`。
 
-用户插件不要放进 `runtime/plugins/`。用设置页「插件市场」从在线货架安装，或导入本地 zip/文件夹。文件写到数据目录（默认 `%APPDATA%\BetterHeyboxChat\plugins\<id>\`）。第三方插件源码在独立仓 [BetterHeyboxChat-plugins](https://github.com/BetterSomething/BetterHeyboxChat-plugins)，发 PR 投稿。
+用户插件用设置页「插件市场」从在线货架安装，或导入本地 zip/文件夹。文件写到数据目录（默认 `%APPDATA%\BetterHeyboxChat\plugins\<id>\`）。官方示例与第三方投稿都在独立仓，发 PR 即可。
 
 第三方插件发到独立仓，不要 PR 进框架仓：
 
@@ -173,45 +175,60 @@ BHChat.openSettings('betterheyboxchat');
 
 ## 参考实现
 
-内置 `runtime/plugins/custom-room-bg/`：
+官方货架 `custom-room-bg`：
 
 - `BHChat.watch` 订阅 `cur_room_data`
 - `registerPanel` 提供房间背景表单
 - `BHChat.roomBg` 作为该插件的公开命令
 
-内置 `runtime/plugins/channel-tts/`：
+官方货架 `channel-tts`：
 
 - 经 `__bhchat_module_map__.EVENT_BUS` 订阅 `SOCKET_SEND_MESSAGE` / `SOCKET_USER_IM_MESSAGE`（不要写死模块数字 ID）
 - 只朗读当前正在看的频道的**新**消息（`channel_data` / `channelIMId` / 语音频道，含语音房文字），用 `window.speechSynthesis` 排队播放
 - `registerPanel` 提供语速、音量、是否读昵称、测试朗读、立即停止
 
-内置 `runtime/plugins/laughter-fav-fix/`：
+官方货架 `laughter-fav-fix`：
 
 - 频道内收藏/取消收藏他人语音包后，补发官方 `Refresh_User_Laughter`（与语音包平台收藏相同）
 - 监听 Vuex `SET_FAVORITE_VOICE_PACK_IDS`；不写死模块数字 ID，不伪造收藏协议
 
-内置 `runtime/plugins/screen-share-danmaku/`：
+官方货架 `screen-share-danmaku`：
 
 - 屏幕共享画面上以弹幕显示当前房间文字消息（同一套 `SOCKET_SEND_MESSAGE` / `SOCKET_USER_IM_MESSAGE`）
 - 观众端只在官方 `screen_sharing_info.user_id`（正在观看）且 occupy 可见时挂弹幕；自己共享挂 `.cpt-screenshare-me-preview`；不挂到房间聊天主区。输入框挂官方 `.screen-share-operate`
 - 画中画时把弹幕合成进 PiP（Electron 走 canvas 流）；发送走官方发信通道，不伪造协议、不碰 RTC
 
-内置 `runtime/plugins/official-room-deco/`：
+官方货架 `screen-share-stream`：
+
+- 共享者在 `cur_channel_data.members[].screen_share_info` / getter `screen_share_user_list`，不必先点「观看共享」
+- 探测只走 `52587.Wj`（check）+ `26737.IX`（token）；token 在 `result.res`（`api_type`/`app_id`），没有 HLS/RTMP
+- 看别人：火山 `23255` / TRTC `2597` 的 `startReceiveScreenCapture` 拉到隐藏容器，本机 `http://127.0.0.1:18080/watch.mjpg`
+- 自己开：FFmpeg `-listen` 收本机 RTMP，火山 `setVideoSourceType(屏幕,外部)` + `pushExternalVideoFrame`；仍走官方 `reportScreenShareRole`
+- 编码默认 1080p60，可改 480–2160 / 15–60；HTTP start 若拒绝则提示，不谎报档位
+- 仍可用官方窗口采集作回退；不 hook RTC 音频；密钥打码后才显示
+
+官方货架 `official-room-deco`：
 
 - 设置页探测官方全员房间背景写接口；忽略客户端 `can_change_bg_pic` / `room_decorate`
 - 换图走官方 `uploadCustomFile({ source: 'room_deco_pic' })`，保存走 webpack `26737.DC` → `POST /chatroom/v2/room/decorate`（仅 1.56.0）
 - 服务端仍可能拒绝；结果 JSON 打在设置页上
 
-内置 `runtime/plugins/block-update/`：
+官方货架 `block-update`：
 
 - 设置页开关分别屏蔽完整更新（`electronAPI.updateClient`）和热更新（`updateAsarResource` / `setAsarVersion`）
 - 开关写入 `betterheyboxchat/update-block.json`，由 main-bridge 在主进程拦截 IPC
 - 可调用 `BHChat.patch.ensure()` 立刻补回被热更新盖掉的 html / preload 注入
 
-内置 `runtime/plugins/export-credentials/`：
+官方货架 `export-credentials`：
 
 - 设置页一键导出当前 `heybox_id` / `pkey`、官方 API query 和 `api.xiaoheihe.cn` 会话 Cookie
 - 给独立脚本用；**不要**发给别人或提交仓库。插件本身不把凭据写入 `BHChat.storage`
 
-复制 `custom-room-bg` 目录是最快的起步方式。
+官方货架 `heybox-dev-mcp`：
+
+- 渲染进程开 `127.0.0.1` HTTP 桥，握手写 `{dataRoot}/heybox-dev-mcp.json`
+- Cursor 跑同目录 `mcp-server.mjs`；内置 env/vuex/storage 打码，`eval` 是裸执行
+- 不改 `ELECTRON_ENV`，不依赖 `--remote-debugging-port`
+
+复制插件仓里的 `custom-room-bg` 目录是最快的起步方式。
 

@@ -24,8 +24,8 @@ flowchart TB
     end
 
     subgraph plugins [插件]
-        B[custom-room-bg]
-        X[第三方插件]
+        B[marketplace 内置]
+        X[货架 / 用户插件]
     end
 
     GUI --> patch
@@ -74,31 +74,16 @@ flowchart TB
 
 ```
 runtime/plugins/
-  my-plugin/
+  marketplace/       # 唯一内置插件
     manifest.json
     index.js
-    style.css        # 可选
 ```
 
-`runtime/plugins.json` 是加载清单（安装时随 runtime 部署）。字段与各插件 `manifest.json` 对齐：
-
-```json
-{
-  "id": "custom-room-bg",
-  "name": "自定义房间背景",
-  "version": "1.0.0",
-  "author": "AwCat",
-  "repository": "https://github.com/BetterSomething/BetterHeyboxChat",
-  "desc": "为当前房间设置仅自己可见的自定义背景图。",
-  "minClientVersion": "1.56.0",
-  "enabled": true,
-  "entry": "index.js"
-}
-```
+`runtime/plugins.json` 是**内置**加载清单（安装时随 runtime 部署），目前只有 `marketplace`。字段与该插件 `manifest.json` 对齐。官方功能插件在独立仓 [BetterHeyboxChat-plugins](https://github.com/BetterSomething/BetterHeyboxChat-plugins)，由用户从市场安装。
 
 用户开关写入本地存储 `bhchat.plugins.enabled`，覆盖 manifest 默认值。禁用的插件**不加载脚本**，设置页仍列出以便重新打开。开关**重启后生效**；设置页有「立即重启客户端」按钮（`BHChat.restart()` → `electronAPI.restartApp`）。
 
-用户安装的插件不写入 `runtime/plugins/`，而在 `{dataRoot}/plugins/<id>/`。`dataRoot` 默认 `%APPDATA%\BetterHeyboxChat`，可用安装器「修改数据地址」更改。loader 合并 `plugins.json` 与用户目录扫描结果；内置 id 禁止覆盖。
+用户安装的插件不写入 `runtime/plugins/`，而在 `{dataRoot}/plugins/<id>/`。`dataRoot` 默认 `%APPDATA%\BetterHeyboxChat`，可用安装器「修改数据地址」更改。loader 合并 `plugins.json` 与用户目录扫描结果；内置 id（仅 `marketplace`）禁止覆盖。
 
 ## BHChat API（稳定面摘要）
 
@@ -145,7 +130,7 @@ window.BHChat = {
 | 主进程入口 | `index.js` | 头部 require main-bridge |
 | 运行时 | `betterheyboxchat/` | 复制 `runtime/` |
 
-热更新可能覆盖 `webapp`。`main-bridge` 在窗口加载前跑 `ensurePatches`，缺标记就补回 html / preload / index.js。内置插件 `block-update` 可拦截 `update-client`（完整更新）和 `updateAsarResource` / `setAsarVersion`（热更新）。
+热更新可能覆盖 `webapp`。`main-bridge` 在窗口加载前跑 `ensurePatches`，缺标记就补回 html / preload / index.js。货架插件 `block-update` 可拦截 `update-client`（完整更新）和 `updateAsarResource` / `setAsarVersion`（热更新）。
 
 ## 调试
 

@@ -20,7 +20,7 @@
 
 ### `onReady(cb)`
 
-运行时加载完启用中的插件后调用 `cb`。若在 `_ready` 之后注册，**不会**补触发——内置插件应在脚本顶层 `BHChat.onReady(activate)`（loader 先执行插件再 `_ready`）。
+运行时加载完启用中的插件后调用 `cb`。若在 `_ready` 之后注册，**不会**补触发——插件应在脚本顶层 `BHChat.onReady(activate)`（loader 先执行插件再 `_ready`）。
 
 也可监听 `BHChat.on('ready', cb)`。
 
@@ -130,7 +130,7 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 
 ## 插件管理
 
-清单来自 `plugins.json`；即使用户禁用，loader 仍会 `_registerPlugin` 以便设置页列出。
+内置清单来自 `plugins.json`（目前只有市场），用户插件来自 `{dataRoot}/plugins/` 扫描。即使用户禁用，loader 仍会 `_registerPlugin` 以便设置页列出。
 
 ### `listPlugins()` / `getPlugin(id)`
 
@@ -212,7 +212,9 @@ inspect 结果供设置页确认框使用。`desc`/`name`/`author` 已去除 HTM
 
 主进程 hook 见 `main-bridge.js`。`ELECTRON_ENV` 必须保持 `prod`。
 
-## 内置插件附加 API
+## 官方货架插件附加 API
+
+以下 API 仅在用户从插件市场安装并启用对应插件后存在。框架本身不再内置这些插件。
 
 `custom-room-bg` 启用后挂载：
 
@@ -258,10 +260,36 @@ BHChat.officialRoomDeco.decorate(patch?)
 BHChat.officialRoomDeco.applying()
 ```
 
+`screen-share-stream` 启用后挂载（探测只走 check / token；本机 MJPEG 看别人；`startOfficialShare` 才走官方开共享）：
+
+```javascript
+BHChat.screenShareStream.probe()
+BHChat.screenShareStream.getStatus()
+BHChat.screenShareStream.getLocalEndpoints()
+BHChat.screenShareStream.startRtmp()
+BHChat.screenShareStream.stopRtmp()
+BHChat.screenShareStream.startPlay()
+BHChat.screenShareStream.stopPlay()
+BHChat.screenShareStream.listSources()
+BHChat.screenShareStream.startOfficialShare(source)
+BHChat.screenShareStream.startObsPush()
+BHChat.screenShareStream.stopObsPush()
+BHChat.screenShareStream.getSettings()
+BHChat.screenShareStream.setSettings(patch)
+```
+
 `export-credentials` 启用后挂载（从当前登录态收集官方 API query / Cookie，**不要**把结果写入仓库）：
 
 ```javascript
 BHChat.exportCredentials.snapshot()
+```
+
+`heybox-dev-mcp` 启用后挂载（本机 `127.0.0.1` HTTP 桥，给 Cursor MCP 用；**不要**把握手 token / pkey 写入仓库）：
+
+```javascript
+BHChat.heyboxDevMcp.getStatus()
+BHChat.heyboxDevMcp.start()
+BHChat.heyboxDevMcp.stop()
 ```
 
 第三方插件不要依赖这些名字，除非你明确依赖该插件。
