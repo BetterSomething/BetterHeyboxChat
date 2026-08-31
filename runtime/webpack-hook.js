@@ -44,6 +44,40 @@
     );
   }
 
+  function hRestartDialog(h, onConfirm, onCancel, onMaskClick) {
+    return h(
+      'div',
+      { class: 'bhchat-dialog-mask', on: { click: onMaskClick || onCancel } },
+      [
+        h(
+          'div',
+          {
+            class: 'bhchat-dialog',
+            on: {
+              click: function (e) {
+                if (e && e.stopPropagation) e.stopPropagation();
+              },
+            },
+          },
+          [
+            h('div', { class: 'bhchat-dialog-title' }, '确认重启客户端'),
+            h('div', { class: 'bhchat-dialog-body' }, [
+              h(
+                'div',
+                { class: 'bhchat-dialog-desc' },
+                '将立即重启黑盒语音。正在进行的通话或未保存的内容会中断。',
+              ),
+            ]),
+            h('div', { class: 'bhchat-dialog-actions' }, [
+              hBtn(h, '确认重启', 'danger', onConfirm),
+              hBtn(h, '取消', 'secondary', onCancel),
+            ]),
+          ],
+        ),
+      ],
+    );
+  }
+
   function findPanel(panels, id) {
     if (!id || !panels || !panels.length) return null;
     for (var i = 0; i < panels.length; i++) {
@@ -72,6 +106,7 @@
           panels: [],
           activePanelId: '',
           restartStatus: '',
+          restartDialog: false,
           devToolsEnabled: true,
           devToolsStatus: '',
           indicatorVisible: true,
@@ -88,6 +123,7 @@
         },
       },
       mounted: function () {
+        var self = this;
         this.refresh();
         this.refreshDevTools();
         this.refreshIndicator();
@@ -95,6 +131,10 @@
           window.BHChat.on('panel-registered', this.refreshPanels);
           window.BHChat.on('plugin-enabled-changed', this.refreshPlugins);
         }
+        this._onRestartKey = function (e) {
+          if (e && e.key === 'Escape' && self.restartDialog) self.onCancelRestart();
+        };
+        document.addEventListener('keydown', this._onRestartKey);
       },
       activated: function () {
         this.refresh();
@@ -106,6 +146,7 @@
           window.BHChat.off('panel-registered', this.refreshPanels);
           window.BHChat.off('plugin-enabled-changed', this.refreshPlugins);
         }
+        if (this._onRestartKey) document.removeEventListener('keydown', this._onRestartKey);
       },
       methods: {
         refresh: function () {
@@ -153,7 +194,17 @@
           });
         },
         onRestart: function () {
+          this.restartDialog = true;
+        },
+        onCancelRestart: function () {
+          this.restartDialog = false;
+        },
+        onRestartDialogMaskClick: function (e) {
+          if (e && e.target === e.currentTarget) this.onCancelRestart();
+        },
+        onConfirmRestart: function () {
           var self = this;
+          this.restartDialog = false;
           if (!window.BHChat || !window.BHChat.restart) {
             this.restartStatus = '重启接口不可用，请手动重启黑盒语音。';
             return;
@@ -207,7 +258,7 @@
         var self = this;
         var activePanel = findPanel(this.panels, this.activePanelId);
         if (activePanel) {
-          return h('div', { class: 'block betterheyboxchat-setting-block' }, [
+          var panelChildren = [
             h('p', { class: 'title' }, 'BetterHeyboxChat'),
             h('div', { class: 'cell' }, [
               h('div', { class: 'bhchat-panel-nav' }, [
@@ -215,7 +266,13 @@
               ]),
               h(activePanel.component),
             ]),
-          ]);
+          ];
+          if (this.restartDialog) {
+            panelChildren.push(
+              hRestartDialog(h, this.onConfirmRestart, this.onCancelRestart, this.onRestartDialogMaskClick),
+            );
+          }
+          return h('div', { class: 'block betterheyboxchat-setting-block' }, panelChildren);
         }
 
         var pluginRows = [];
@@ -304,7 +361,7 @@
         var pluginChildren = [
           h('div', { class: 'cell-title' }, '已安装插件'),
           h('div', { class: 'bhchat-list' }, pluginRows),
-          h('div', { class: 'bhchat-actions' }, [hBtn(h, '立即重启客户端', 'primary', this.onRestart)]),
+          h('div', { class: 'bhchat-actions' }, [hBtn(h, '立即重启客户端', 'danger', this.onRestart)]),
         ];
         if (this.pendingRestart) {
           pluginChildren.push(h('p', { class: 'bhchat-hint' }, '插件开关已更改，重启后生效。'));
@@ -327,37 +384,39 @@
           ]),
         ];
 
-        return h(
-          'div',
-          { class: 'block betterheyboxchat-setting-block' },
-          [
-            h('p', { class: 'title' }, 'BetterHeyboxChat'),
-            h('div', { class: 'cell' }, [
-              h('div', { class: 'cell-title' }, '框架'),
-              h('div', { class: 'bhchat-list' }, [
-                h('div', { class: 'row' }, [
-                  h('span', '版本'),
-                  h('span', { class: 'bhchat-row-value' }, this.frameworkVersion),
-                ]),
-                h('div', { class: 'row' }, [
-                  h('span', '客户端'),
-                  h(
-                    'span',
-                    { class: 'bhchat-row-value' },
-                    (window.BHChat && window.BHChat.clientVersion) || 'unknown',
-                  ),
-                ]),
+        var mainChildren = [
+          h('p', { class: 'title' }, 'BetterHeyboxChat'),
+          h('div', { class: 'cell' }, [
+            h('div', { class: 'cell-title' }, '框架'),
+            h('div', { class: 'bhchat-list' }, [
+              h('div', { class: 'row' }, [
+                h('span', '版本'),
+                h('span', { class: 'bhchat-row-value' }, this.frameworkVersion),
+              ]),
+              h('div', { class: 'row' }, [
+                h('span', '客户端'),
                 h(
-                  'div',
-                  { class: 'row bhchat-row-click', on: { click: this.onToggleIndicator } },
-                  [h('span', '显示角标'), hSwitch(h, this.indicatorVisible)],
+                  'span',
+                  { class: 'bhchat-row-value' },
+                  (window.BHChat && window.BHChat.clientVersion) || 'unknown',
                 ),
               ]),
+              h(
+                'div',
+                { class: 'row bhchat-row-click', on: { click: this.onToggleIndicator } },
+                [h('span', '显示角标'), hSwitch(h, this.indicatorVisible)],
+              ),
             ]),
-            h('div', { class: 'cell' }, pluginChildren),
-            h('div', { class: 'cell' }, dtChildren),
-          ],
-        );
+          ]),
+          h('div', { class: 'cell' }, pluginChildren),
+          h('div', { class: 'cell' }, dtChildren),
+        ];
+        if (this.restartDialog) {
+          mainChildren.push(
+            hRestartDialog(h, this.onConfirmRestart, this.onCancelRestart, this.onRestartDialogMaskClick),
+          );
+        }
+        return h('div', { class: 'block betterheyboxchat-setting-block' }, mainChildren);
       },
     };
   }
@@ -411,6 +470,15 @@
       '.betterheyboxchat-setting-block .bhchat-native-range:disabled{opacity:.5;cursor:not-allowed}',
       '.betterheyboxchat-setting-block .bhchat-native-preview{height:120px;margin:8px 0;border-radius:8px;background:var(--opacity-1,rgba(0,0,0,.2)) center/cover no-repeat;border:1px solid var(--opacity-2,rgba(255,255,255,.08))}',
       '.betterheyboxchat-setting-block .bhchat-warn{color:var(--f-error-text,#f64e54);font-size:13px;line-height:20px;margin:0 0 8px}',
+      '.bhchat-dialog-mask{position:fixed;inset:0;z-index:12000;display:flex;align-items:center;justify-content:center;background:var(--opacity-s5,rgba(0,0,0,.7))}',
+      '.bhchat-dialog{width:min(420px,calc(100vw - 48px));max-height:min(70vh,520px);overflow:auto;padding:20px 20px 16px;border-radius:12px;background:var(--fill-1,#36393e);color:var(--text-1,#fff);box-shadow:0 12px 40px rgba(0,0,0,.4)}',
+      'html[theme=light] .bhchat-dialog,body[theme=light] .bhchat-dialog{background:var(--fill-1,#fff);color:var(--text-1,#000);box-shadow:0 12px 40px rgba(0,0,0,.18)}',
+      '.bhchat-dialog-title{font-size:16px;font-weight:700;line-height:22px;margin:0 0 14px;color:var(--text-1,#fff)}',
+      'html[theme=light] .bhchat-dialog-title,body[theme=light] .bhchat-dialog-title{color:var(--text-1,#000)}',
+      '.bhchat-dialog-body{display:flex;flex-direction:column;gap:8px}',
+      '.bhchat-dialog-desc{margin:4px 0 0;font-size:13px;line-height:20px;color:var(--text-2,#d2d3d7);white-space:pre-wrap;word-break:break-word}',
+      'html[theme=light] .bhchat-dialog-desc,body[theme=light] .bhchat-dialog-desc{color:var(--text-2,#32373c)}',
+      '.bhchat-dialog-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:16px 0 0}',
     ].join('');
     document.head.appendChild(style);
   }
