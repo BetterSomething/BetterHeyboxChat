@@ -1,5 +1,7 @@
-# BetterHeyboxChat
+# BetterHeyboxChat  
 
+[![Release installer](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/release.yml/badge.svg)](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/release.yml)  
+[![Dev installer](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/dev.yml/badge.svg)](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/dev.yml)  
 ---
 
 [假装这里有个 LOGO, LOGO 位招猪]  
@@ -15,8 +17,9 @@
 
 #### 普通用户
 
-去仓库的 [Releases](https://github.com/BetterSomething/BetterHeyboxChat/releases/) 下载 `bhchat-installer-0.x.0.exe` 并运行。  
-开发快照在固定的 [dev Pre-release](https://github.com/BetterSomething/BetterHeyboxChat/releases/tag/dev)，文件名是 `bhchat-installer-<短SHA>.exe`。
+正式版: 去仓库的 [Releases](https://github.com/BetterSomething/BetterHeyboxChat/releases/) 下载 `bhchat-installer-x.x.x.exe` 并运行  
+
+开发版(享受最新功能，但可能有神秘bug和特性): 在固定的 [dev](https://github.com/BetterSomething/BetterHeyboxChat/releases/tag/dev)，文件名是 `bhchat-installer-<短SHA>.exe`
 
 #### 开发者
 
@@ -45,8 +48,9 @@ pnpm bhchat install --path "D:\Program Files\Qingfeng\HeyboxChat" --yes
 
 ### 发版
 
-- 正式版：`git tag v0.2.0 && git push origin v0.2.0`，或在 Actions 里手动跑 **Release installer** 并填 `0.2.0`。Release 说明会列出上一正式版以来的 Conventional Commits。
-- 开发版：推到 `main` 后自动覆盖 [dev Pre-release](https://github.com/BetterSomething/BetterHeyboxChat/releases/tag/dev)。
+- 正式版：`git tag vx.x.x && git push origin vx.x.x`，或在 Actions 里手动跑 **Release installer** 并填上版本号，Release 说明会列出上一正式版以来的所有变更
+
+- 开发版：推到 `main` 后自动覆盖 [dev Pre-release](https://github.com/BetterSomething/BetterHeyboxChat/releases/tag/dev)
 
 
 
@@ -72,4 +76,4 @@ docs/               对外文档
 
 ## 鸣谢
 
-各大 LLM
+各大 Agent
