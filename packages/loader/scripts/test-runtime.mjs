@@ -359,6 +359,9 @@ assert(
   /info\.user_id/.test(danmakuSource),
   '观众端是否在看共享应与官方 ScreenShareOccupy.isWatching 一致：Boolean(screen_sharing_info.user_id)',
 );
+assert(/quality-block/.test(danmakuSource), '连接模式角标应贴官方 quality-block');
+assert(/tryP2PReupgrade/.test(danmakuSource), '切到 P2P 应走官方 $rtc.tryP2PReupgrade');
+assert(/cancelP2PUpgrade/.test(danmakuSource), '切到中转应走官方 $rtc.cancelP2PUpgrade');
 
 
 assert(registryHas('laughter-fav-fix'), '插件仓 registry 应登记 laughter-fav-fix');
