@@ -59,7 +59,7 @@ try { require('./betterheyboxchat/main-bridge.js'); } catch (e) { console.error(
 ${MARKER_END}
 `.trim();
 
-export const SUPPORTED_CLIENT_VERSIONS = ['1.56.0'];
+export const SUPPORTED_CLIENT_VERSIONS = ['1.56.0', '1.57.0'];
 
 /** Program Files 常见路径。官方默认目录 `%LOCALAPPDATA%\\Qingfeng\\HeyboxChat` 由 `defaultInstallFallbacks` 动态补上。 */
 export const DEFAULT_INSTALL_CANDIDATES = [

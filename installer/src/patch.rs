@@ -426,6 +426,18 @@ mod tests {
     /// include_dir 的 File::path() / Dir::path() 都相对被 include 的 runtime 根。
     /// 写出时必须拼到 deploy_root，不能先进入 lib/ 再拼接 `lib/storage.js`。
     #[test]
+    fn assert_client_supported_accepts_157() {
+        assert_client_supported("1.57.0").expect("1.57.0 应已纳入兼容表");
+    }
+
+    #[test]
+    fn assert_client_supported_rejects_unknown() {
+        let err = assert_client_supported("9.9.9").expect_err("未知版本应拒绝");
+        assert!(err.contains("9.9.9"), "{err}");
+        assert!(err.contains("暂未纳入兼容表"), "{err}");
+    }
+
+    #[test]
     fn embedded_nested_file_joins_from_deploy_root_only() {
         let root = Path::new("betterheyboxchat");
         assert_eq!(

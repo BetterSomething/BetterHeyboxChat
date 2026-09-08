@@ -26,6 +26,9 @@ if (!source.includes('patch-guard') || !source.includes('ensurePatches')) {
 if (!source.includes('wrapIpcMain')) {
   throw new Error('FAIL: main-bridge 必须拦截官方更新 IPC');
 }
+if (!source.includes('attachUpdateApiFilter') || !source.includes('webContents.session')) {
+  throw new Error('FAIL: main-bridge 必须在 session 上拦截官方检查更新 API');
+}
 const guardSource = fs.readFileSync(
   path.resolve(__dirname, '../../../runtime/lib/patch-guard.js'),
   'utf8',

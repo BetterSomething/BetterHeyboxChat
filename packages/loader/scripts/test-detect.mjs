@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { SUPPORTED_CLIENT_VERSIONS } from '../dist/constants.js';
 import {
   collectCandidateRoots,
   defaultInstallFallbacks,
   stripIconIndex,
 } from '../dist/detect.js';
+
+assert.ok(SUPPORTED_CLIENT_VERSIONS.includes('1.56.0'), '兼容表应包含 1.56.0');
+assert.ok(SUPPORTED_CLIENT_VERSIONS.includes('1.57.0'), '兼容表应包含 1.57.0');
 
 assert.equal(
   stripIconIndex(String.raw`D:\Program Files\Qingfeng\HeyboxChat\HeyboxChat.exe`),

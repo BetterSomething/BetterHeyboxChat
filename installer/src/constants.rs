@@ -25,7 +25,7 @@ pub const INDEX_SNIPPET: &str = r"// BetterHeyboxChat:begin
 try { require('./betterheyboxchat/main-bridge.js'); } catch (e) { console.error('[BetterHeyboxChat] main bridge failed:', e); }
 // BetterHeyboxChat:end";
 
-pub const SUPPORTED_CLIENT_VERSIONS: &[&str] = &["1.56.0"];
+pub const SUPPORTED_CLIENT_VERSIONS: &[&str] = &["1.56.0", "1.57.0"];
 
 /// Program Files 常见路径。官方默认目录 `%LOCALAPPDATA%\Qingfeng\HeyboxChat` 由 `default_install_fallbacks` 动态补上。
 pub const DEFAULT_INSTALL_CANDIDATES: &[&str] = &[
@@ -52,5 +52,17 @@ mod tests {
     #[test]
     fn dev_label_uses_raw_sha() {
         assert_eq!(format_installer_label("c357f16", "dev"), "安装器  c357f16");
+    }
+
+    #[test]
+    fn whitelist_includes_current_official_clients() {
+        assert!(
+            super::SUPPORTED_CLIENT_VERSIONS.contains(&"1.56.0"),
+            "1.56.0 应仍在兼容表"
+        );
+        assert!(
+            super::SUPPORTED_CLIENT_VERSIONS.contains(&"1.57.0"),
+            "1.57.0 整包替换后必须能装"
+        );
     }
 }

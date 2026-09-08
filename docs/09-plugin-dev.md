@@ -206,8 +206,8 @@ BHChat.openSettings('betterheyboxchat');
 
 官方货架 `block-update`：
 
-- 设置页开关分别屏蔽完整更新（`electronAPI.updateClient`）和热更新（`updateAsarResource` / `setAsarVersion`）
-- 开关写入 `betterheyboxchat/update-block.json`，由 main-bridge 在主进程拦截 IPC
+- 阻断官方 `/chatroom/v2/settings/version/update/check`，检查失败则不弹更新窗
+- 开关写入 `betterheyboxchat/update-block.json`；main-bridge 用 session webRequest 取消该 API，IPC 只作兜底
 - 可调用 `BHChat.patch.ensure()` 立刻补回被热更新盖掉的 html / preload 注入
 
 官方货架 `export-credentials`：

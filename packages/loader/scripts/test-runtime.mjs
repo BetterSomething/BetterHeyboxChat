@@ -391,8 +391,11 @@ assert(/bhchat-switch/.test(blockSource), '屏蔽更新应使用开关');
 assert(/bhchat-switch-core/.test(blockSource), '屏蔽更新开关须使用 bhchat-switch-core（宿主 CSS 只画这一层）');
 assert(!/bhchat-switch-knob/.test(blockSource), '屏蔽更新不得使用无样式的 bhchat-switch-knob');
 assert(/bhchat-row-click/.test(blockSource), '屏蔽更新开关行应可整行点击');
-assert(/updateClient/.test(blockSource) && /updateAsarResource/.test(blockSource), '屏蔽更新应钩官方 electronAPI 更新方法');
-assert(/setAsarVersion/.test(blockSource), '屏蔽更新应拦截切换 asar 版本');
+assert(
+  /\/chatroom\/v2\/settings\/version\/update\/check/.test(blockSource),
+  '屏蔽更新应阻断官方检查更新 API',
+);
+assert(/XMLHttpRequest|\.fetch\b|window\.fetch/.test(blockSource), '屏蔽更新应在请求层拦截检查更新');
 assert(/updateBlock/.test(blockSource), '屏蔽更新应把开关写到 preload/main-bridge 可读的标记');
 assert(!/'30570'|\"30570\"/.test(blockSource), '屏蔽更新不应写死 EventBus 模块 ID');
 

@@ -19,6 +19,7 @@ try {
   if (ensured && ensured.repaired && ensured.repaired.length) {
     console.log('[BetterHeyboxChat] repaired patches:', ensured.repaired.join(', '));
   }
+  patchGuard.ensureDefaultBlockFlags(__dirname);
 } catch (err) {
   console.warn('[BetterHeyboxChat] ensure patches failed:', err);
 }
@@ -84,14 +85,34 @@ function patchElectron(mod) {
   if (!mod || !mod.app || mod.app.__bhchat_dt) return;
 
   mod.app.__bhchat_dt = true;
+  function attachUpdateFilter(ses) {
+    if (!ses) return;
+    try {
+      patchGuard.attachUpdateApiFilter(ses, function () {
+        return patchGuard.readBlockFlags(__dirname);
+      });
+    } catch (err) {
+      console.warn('[BetterHeyboxChat] wrap update api filter failed:', err);
+    }
+  }
+
   mod.app.on('browser-window-created', (_event, win) => {
     attachShortcuts(win);
+    try {
+      if (win && win.webContents && win.webContents.session) {
+        attachUpdateFilter(win.webContents.session);
+      }
+    } catch (err) {}
   });
 
   if (mod.app.isReady()) {
     attachExisting(mod);
+    if (mod.session && mod.session.defaultSession) attachUpdateFilter(mod.session.defaultSession);
   } else {
-    mod.app.whenReady().then(() => attachExisting(mod));
+    mod.app.whenReady().then(() => {
+      attachExisting(mod);
+      if (mod.session && mod.session.defaultSession) attachUpdateFilter(mod.session.defaultSession);
+    });
   }
 
   if (mod.ipcMain) {

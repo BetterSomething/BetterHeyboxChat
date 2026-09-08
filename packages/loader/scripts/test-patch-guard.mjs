@@ -68,6 +68,40 @@ assert(second.intact.indexOf('webapp/index.html') !== -1, '完整文件应记入
 
 const flagsDefault = guard.readBlockFlags(runtimeDir);
 assert(flagsDefault.client === false && flagsDefault.hotfix === false, '无标记文件时默认不屏蔽');
+assert(guard.isUpdateApiUrl('https://chat.xiaoheihe.cn/chatroom/v2/settings/version/update/check?x=1'), '应识别检查更新 API');
+assert(guard.isUpdateApiUrl('https://chat.xiaoheihe.cn/chatroom/v2/settings/version/content'), '应识别更新日志 API');
+assert(!guard.isUpdateApiUrl('https://chat.xiaoheihe.cn/chatroom/v2/settings/account'), '不得误伤其它 settings 接口');
+assert(
+  guard.shouldBlockUpdateApi({ client: true, hotfix: false }, 'https://x/chatroom/v2/settings/version/update/check'),
+  '任一屏蔽开关打开就应阻断检查更新',
+);
+assert(
+  !guard.shouldBlockUpdateApi({ client: false, hotfix: false }, 'https://x/chatroom/v2/settings/version/update/check'),
+  '两个开关都关时应放行检查更新',
+);
+
+const filterCalls = [];
+const fakeSession = {
+  webRequest: {
+    onBeforeRequest: function (filter, listener) {
+      fakeSession._filter = filter;
+      fakeSession._listener = listener;
+    },
+  },
+};
+guard.attachUpdateApiFilter(fakeSession, function () {
+  return { client: true, hotfix: true };
+});
+assert(fakeSession.webRequest.__bhchat_update_api, '应标记已挂 webRequest');
+assert(fakeSession._filter && fakeSession._filter.urls, 'webRequest 应带 URL 过滤');
+fakeSession._listener({ url: 'https://x/chatroom/v2/settings/version/update/check' }, function (ret) {
+  filterCalls.push(ret);
+});
+fakeSession._listener({ url: 'https://x/chatroom/v2/settings/account' }, function (ret) {
+  filterCalls.push(ret);
+});
+assert(filterCalls[0] && filterCalls[0].cancel === true, '检查更新 URL 应 cancel');
+assert(filterCalls[1] && !filterCalls[1].cancel, '其它 URL 应放行');
 guard.writeBlockFlags(runtimeDir, { client: true, hotfix: true });
 const flagsOn = guard.readBlockFlags(runtimeDir);
 assert(flagsOn.client === true && flagsOn.hotfix === true, '应能持久化屏蔽开关');

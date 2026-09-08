@@ -30,6 +30,9 @@ var INDEX_SNIPPET = [
 
 var BLOCK_FILE = 'update-block.json';
 var STATUS_FILE = 'patch-status.json';
+var UPDATE_CHECK_PATH = '/chatroom/v2/settings/version/update/check';
+var UPDATE_CONTENT_PATH = '/chatroom/v2/settings/version/content';
+var UPDATE_API_FILTER = ['*://*/chatroom/v2/settings/version/*'];
 
 function resolveAppDir(runtimeDir) {
   return path.join(runtimeDir, '..');
@@ -50,12 +53,41 @@ function writeJson(filePath, value) {
   fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf8');
 }
 
+function hasBlockUpdatePlugin() {
+  try {
+    var pluginStore = require('./plugin-store.js');
+    var list = pluginStore.listUserPlugins() || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].id === 'block-update') return true;
+    }
+  } catch (err) {}
+  return false;
+}
+
+function isUpdateApiUrl(url) {
+  var text = String(url || '');
+  return text.indexOf(UPDATE_CHECK_PATH) !== -1 || text.indexOf(UPDATE_CONTENT_PATH) !== -1;
+}
+
+function shouldBlockUpdateApi(flags, url) {
+  flags = flags || {};
+  if (!isUpdateApiUrl(url)) return false;
+  return !!(flags.client || flags.hotfix);
+}
+
 function readBlockFlags(runtimeDir) {
   var saved = readJson(path.join(runtimeDir, BLOCK_FILE), {});
   return {
     client: !!saved.client,
     hotfix: !!saved.hotfix,
   };
+}
+
+function ensureDefaultBlockFlags(runtimeDir) {
+  var filePath = path.join(runtimeDir, BLOCK_FILE);
+  if (fs.existsSync(filePath)) return readBlockFlags(runtimeDir);
+  if (!hasBlockUpdatePlugin()) return { client: false, hotfix: false };
+  return writeBlockFlags(runtimeDir, { client: true, hotfix: true });
 }
 
 function writeBlockFlags(runtimeDir, flags) {
@@ -194,6 +226,23 @@ function wrapIpcMain(ipcMain, getFlags) {
   return ipcMain;
 }
 
+function attachUpdateApiFilter(session, getFlags) {
+  if (!session || !session.webRequest || typeof session.webRequest.onBeforeRequest !== 'function') {
+    return session;
+  }
+  if (session.webRequest.__bhchat_update_api) return session;
+  session.webRequest.__bhchat_update_api = true;
+  session.webRequest.onBeforeRequest({ urls: UPDATE_API_FILTER }, function (details, callback) {
+    var flags = typeof getFlags === 'function' ? getFlags() || {} : {};
+    if (shouldBlockUpdateApi(flags, details && details.url)) {
+      callback({ cancel: true });
+      return;
+    }
+    callback({});
+  });
+  return session;
+}
+
 module.exports = {
   MARKER_BEGIN: MARKER_BEGIN,
   MARKER_END: MARKER_END,
@@ -203,11 +252,18 @@ module.exports = {
   INDEX_SNIPPET: INDEX_SNIPPET,
   BLOCK_FILE: BLOCK_FILE,
   STATUS_FILE: STATUS_FILE,
+  UPDATE_CHECK_PATH: UPDATE_CHECK_PATH,
+  UPDATE_CONTENT_PATH: UPDATE_CONTENT_PATH,
+  UPDATE_API_FILTER: UPDATE_API_FILTER,
   resolveAppDir: resolveAppDir,
   ensurePatches: ensurePatches,
   readBlockFlags: readBlockFlags,
   writeBlockFlags: writeBlockFlags,
+  ensureDefaultBlockFlags: ensureDefaultBlockFlags,
   readStatus: readStatus,
   writeStatus: writeStatus,
+  isUpdateApiUrl: isUpdateApiUrl,
+  shouldBlockUpdateApi: shouldBlockUpdateApi,
   wrapIpcMain: wrapIpcMain,
+  attachUpdateApiFilter: attachUpdateApiFilter,
 };

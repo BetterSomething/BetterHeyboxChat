@@ -1,5 +1,5 @@
 /**
- * BetterHeyboxChat Webpack Hook（1.56.0）
+ * BetterHeyboxChat Webpack Hook（1.56.0 / 1.57.0）
  * 必须在 webpack 主包之前同步加载；并处理主包覆盖 push 的情况。
  */
 (function () {

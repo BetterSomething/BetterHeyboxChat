@@ -63,7 +63,7 @@ flowchart TB
 | `main-bridge.js` | F12 / Ctrl+Shift+I；禁止 Proxy 替换 `BrowserWindow` |
 | `preload-bridge.js` | DevTools 开关；**禁止**改 `ELECTRON_ENV` |
 
-模块 ID（仅 1.56.0）对插件隐藏，只在 hook 内部使用：`42416` 设置菜单、`93509` UserConfig、`30570` EventBus、`16886` Vuex。
+模块 ID（1.56.0 / 1.57.0 相同）对插件隐藏，只在 hook 内部使用：`42416` 设置菜单、`93509` UserConfig、`30570` EventBus、`16886` Vuex。
 
 ### 3. Preload Bridge
 
@@ -130,7 +130,7 @@ window.BHChat = {
 | 主进程入口 | `index.js` | 头部 require main-bridge |
 | 运行时 | `betterheyboxchat/` | 复制 `runtime/` |
 
-热更新可能覆盖 `webapp`。`main-bridge` 在窗口加载前跑 `ensurePatches`，缺标记就补回 html / preload / index.js。货架插件 `block-update` 可拦截 `update-client`（完整更新）和 `updateAsarResource` / `setAsarVersion`（热更新）。
+热更新可能覆盖 `webapp`。`main-bridge` 在窗口加载前跑 `ensurePatches`，缺标记就补回 html / preload / index.js。货架插件 `block-update` 阻断 `/chatroom/v2/settings/version/update/check`；main-bridge 用 session webRequest 取消该请求，IPC 只作下载兜底。
 
 ## 调试
 
