@@ -65,7 +65,7 @@
               h(
                 'div',
                 { class: 'bhchat-dialog-desc' },
-                '将立即重启黑盒语音。正在进行的通话或未保存的内容会中断。',
+                '将立即重启黑盒语音。通话会先断开，重启后会尽量回到原来的页面和语音频道。',
               ),
             ]),
             h('div', { class: 'bhchat-dialog-actions' }, [

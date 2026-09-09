@@ -8,6 +8,7 @@
   var VERSION_SCRIPT = '../betterheyboxchat/lib/version.js';
   var RUNTIME_SCRIPT = '../betterheyboxchat/runtime.js';
   var STORAGE_SCRIPT = '../betterheyboxchat/lib/storage.js';
+  var SESSION_SCRIPT = '../betterheyboxchat/lib/session-restore.js';
   var INDICATOR_SCRIPT = '../betterheyboxchat/indicator.js';
   var PLUGINS_MANIFEST = '../betterheyboxchat/plugins.json';
 
@@ -91,6 +92,11 @@
         if (!window.BHChat) {
           throw new Error('BHChat runtime missing after load');
         }
+        return loadScript(SESSION_SCRIPT).catch(function (err) {
+          console.warn('[BetterHeyboxChat] session restore skipped:', err);
+        });
+      })
+      .then(function () {
         if (window.BHChat._loadEnabledMap) {
           return window.BHChat._loadEnabledMap();
         }

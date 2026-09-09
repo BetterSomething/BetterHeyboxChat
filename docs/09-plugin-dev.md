@@ -156,7 +156,7 @@ await store.del('volume');
 用户在设置 → BetterHeyboxChat → 已安装插件里切换。当前进程**不会**卸载已运行的脚本。
 
 - `BHChat.listPlugins()` 里 `enabled !== loaded` 表示需要重启
-- 需要立刻生效时调用 `BHChat.restart()`（与设置页「立即重启客户端」相同）
+- 需要立刻生效时调用 `BHChat.restart()`（与设置页「立即重启客户端」相同）。会先记下当前页面和语音频道，重启后尽量加回去。
 - 插件自己不要在 `activate` 里再注册一份启停逻辑去热拆 DOM，除非你明确支持
 
 

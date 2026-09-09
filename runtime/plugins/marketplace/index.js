@@ -962,8 +962,8 @@
         }).filter(Boolean);
         var restartDesc = afterInstall
           ? (installed.length ? '已安装 ' + installed.join('、') + '，' : '插件已安装，') +
-            '重启后才会生效。是否立即重启黑盒语音？正在进行的通话或未保存的内容会中断。'
-          : '将立即重启黑盒语音。正在进行的通话或未保存的内容会中断。';
+            '重启后才会生效。是否立即重启黑盒语音？通话会先断开，重启后会尽量回到原来的页面和语音频道。'
+          : '将立即重启黑盒语音。通话会先断开，重启后会尽量回到原来的页面和语音频道。';
         return h(
           'div',
           { class: 'bhchat-dialog-mask', on: { click: this.onDialogMaskClick } },

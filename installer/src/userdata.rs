@@ -60,6 +60,14 @@ fn env_data_root() -> Option<PathBuf> {
     }
 }
 
+pub const SESSION_RESTORE_INTENT: &str = "session-restore.intent";
+
+pub fn write_session_restore_intent() {
+    let root = current_data_root();
+    let _ = fs::create_dir_all(&root);
+    let _ = fs::write(root.join(SESSION_RESTORE_INTENT), "1");
+}
+
 pub fn current_data_root() -> PathBuf {
     env_data_root()
         .or_else(read_pointer_file)

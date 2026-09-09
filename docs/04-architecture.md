@@ -60,6 +60,7 @@ flowchart TB
 | `runtime.js` | 稳定 `window.BHChat`（Vue/Vuex、事件、存储、启停、重启） |
 | `loader.js` | 读 `bhchat.plugins.enabled`，跳过禁用插件，再 `_ready()` |
 | `lib/storage.js` | `electronAPI` 优先，回退 `localStorage` |
+| `lib/session-restore.js` | 持续快照；installer / `BHChat.restart()` 打标记后，启动时走官方 `$jump` 恢复页面和语音 |
 | `main-bridge.js` | F12 / Ctrl+Shift+I；禁止 Proxy 替换 `BrowserWindow` |
 | `preload-bridge.js` | DevTools 开关；**禁止**改 `ELECTRON_ENV` |
 
@@ -81,7 +82,7 @@ runtime/plugins/
 
 `runtime/plugins.json` 是**内置**加载清单（安装时随 runtime 部署），目前只有 `marketplace`。字段与该插件 `manifest.json` 对齐。官方功能插件在独立仓 [BetterHeyboxChat-plugins](https://github.com/BetterSomething/BetterHeyboxChat-plugins)，由用户从市场安装。
 
-用户开关写入本地存储 `bhchat.plugins.enabled`，覆盖 manifest 默认值。禁用的插件**不加载脚本**，设置页仍列出以便重新打开。开关**重启后生效**；设置页有「立即重启客户端」按钮（`BHChat.restart()` → `electronAPI.restartApp`）。
+用户开关写入本地存储 `bhchat.plugins.enabled`，覆盖 manifest 默认值。禁用的插件**不加载脚本**，设置页仍列出以便重新打开。开关**重启后生效**；设置页有「立即重启客户端」按钮（`BHChat.restart()` 先写恢复标记再 `electronAPI.restartApp`）。installer 安装 / 重装并拉起客户端时也会写同一标记。普通点图标启动不恢复。
 
 用户安装的插件不写入 `runtime/plugins/`，而在 `{dataRoot}/plugins/<id>/`。`dataRoot` 默认 `%APPDATA%\BetterHeyboxChat`，可用安装器「修改数据地址」更改。loader 合并 `plugins.json` 与用户目录扫描结果；内置 id（仅 `marketplace`）禁止覆盖。
 

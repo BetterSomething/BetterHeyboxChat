@@ -158,7 +158,11 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 
 ### `restart()`
 
-调用 `electronAPI.restartApp()`。不可用时 reject。
+先把当前页面 / 语音频道写入快照并打上「请恢复」标记，再调用 `electronAPI.restartApp()`。不可用时 reject。重启后会尽量回到原来的页面和语音频道（15 分钟内、且这次重启带了标记）。普通点图标启动不恢复。
+
+### `BHChat.session`
+
+框架内部用。`capture()` 立刻写快照；`markRestart()` 写快照 + 恢复标记；`restore()` 消费标记并按快照 `$jump` / `router.push`。
 
 ### `BHChat.plugins`
 

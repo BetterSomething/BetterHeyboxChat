@@ -1,4 +1,5 @@
 use crate::client::{restart_heybox_if_was_running, stop_if_running};
+use crate::userdata;
 use crate::constants::{
     BACKUP_DIR, HTML_MARKER, HTML_SNIPPET, INDEX_SNIPPET, LOADER_VERSION, MANIFEST_FILE,
     MARKER_BEGIN, MARKER_END, PRELOAD_SNIPPET, SUPPORTED_CLIENT_VERSIONS,
@@ -98,25 +99,29 @@ pub fn install_patches(install: &ClientInstall) -> Result<(), String> {
 }
 
 pub fn install_patches_managed(install: &ClientInstall) -> Result<String, String> {
-    with_client_restart(install, || install_patches(install), "安装")
+    with_client_restart(install, || install_patches(install), "安装", true)
 }
 
 pub fn reinstall_patches_managed(install: &ClientInstall) -> Result<String, String> {
-    with_client_restart(install, || reinstall_patches(install), "重装")
+    with_client_restart(install, || reinstall_patches(install), "重装", true)
 }
 
 pub fn uninstall_patches_managed(install: &ClientInstall) -> Result<String, String> {
     let app_dir = normalize_path(&install.app_dir);
-    with_client_restart(install, || uninstall_patches(&app_dir), "卸载")
+    with_client_restart(install, || uninstall_patches(&app_dir), "卸载", false)
 }
 
 fn with_client_restart(
     install: &ClientInstall,
     operation: impl FnOnce() -> Result<(), String>,
     action_label: &str,
+    restore_session: bool,
 ) -> Result<String, String> {
     let was_running = stop_if_running()?;
     operation()?;
+    if was_running && restore_session {
+        userdata::write_session_restore_intent();
+    }
     restart_heybox_if_was_running(install, was_running)?;
 
     if was_running {
