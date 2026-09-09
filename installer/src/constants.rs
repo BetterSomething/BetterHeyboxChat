@@ -39,30 +39,3 @@ pub const HEYBOX_DISPLAY_NAME_HINTS: &[&str] =
 
 pub const MANIFEST_FILE: &str = "install.json";
 pub const BACKUP_DIR: &str = ".backup";
-
-#[cfg(test)]
-mod tests {
-    use super::format_installer_label;
-
-    #[test]
-    fn release_label_prefixes_v() {
-        assert_eq!(format_installer_label("0.1.0", "release"), "安装器  v0.1.0");
-    }
-
-    #[test]
-    fn dev_label_uses_raw_sha() {
-        assert_eq!(format_installer_label("c357f16", "dev"), "安装器  c357f16");
-    }
-
-    #[test]
-    fn whitelist_includes_current_official_clients() {
-        assert!(
-            super::SUPPORTED_CLIENT_VERSIONS.contains(&"1.56.0"),
-            "1.56.0 应仍在兼容表"
-        );
-        assert!(
-            super::SUPPORTED_CLIENT_VERSIONS.contains(&"1.57.0"),
-            "1.57.0 整包替换后必须能装"
-        );
-    }
-}

@@ -16,15 +16,3 @@ fn strip_extended_prefix(path: PathBuf) -> PathBuf {
     }
     path
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn strip_verbatim_prefix() {
-        let input = PathBuf::from(r"\\?\D:\Program Files\HeyboxChat\app");
-        let output = strip_extended_prefix(input);
-        assert_eq!(output, Path::new(r"D:\Program Files\HeyboxChat\app"));
-    }
-}

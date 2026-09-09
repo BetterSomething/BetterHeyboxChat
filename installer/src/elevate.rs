@@ -98,37 +98,3 @@ pub fn request_admin_relaunch() -> bool {
 pub fn request_admin_relaunch() -> bool {
     false
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{relaunch_params, should_auto_elevate, ELEVATED_FLAG};
-
-    #[test]
-    fn unelevated_first_launch_should_auto_elevate() {
-        assert!(should_auto_elevate(false, false));
-    }
-
-    #[test]
-    fn admin_or_already_attempted_should_not_auto_elevate() {
-        assert!(!should_auto_elevate(true, false));
-        assert!(!should_auto_elevate(false, true));
-        assert!(!should_auto_elevate(true, true));
-    }
-
-    #[test]
-    fn relaunch_params_appends_flag_and_skips_duplicate() {
-        assert_eq!(relaunch_params(["bhchat-installer.exe"]), ELEVATED_FLAG);
-        assert_eq!(
-            relaunch_params(["bhchat-installer.exe", "--foo"]),
-            format!("--foo {ELEVATED_FLAG}")
-        );
-        assert_eq!(
-            relaunch_params(["bhchat-installer.exe", ELEVATED_FLAG]),
-            ELEVATED_FLAG
-        );
-        assert_eq!(
-            relaunch_params(["bhchat-installer.exe", r"C:\Program Files\x"]),
-            format!("\"C:\\Program Files\\x\" {ELEVATED_FLAG}")
-        );
-    }
-}

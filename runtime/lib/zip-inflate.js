@@ -1,6 +1,6 @@
 /**
  * 极简 zip 解压（仅 store / deflate，无 zip64 / 加密 / data descriptor）
- * Node preload 与测试共用。
+ * 仅在 Node preload 中使用。
  */
 'use strict';
 

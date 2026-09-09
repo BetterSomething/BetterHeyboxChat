@@ -1,6 +1,6 @@
 /**
  * 在线插件货架：只拉 registry.json，按需下载某个插件目录。
- * fetch 可注入，便于单测不走外网。
+ * fetch 可注入，便于替换实现。
  */
 'use strict';
 

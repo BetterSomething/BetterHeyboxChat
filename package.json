@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node scripts/resolve-version.mjs && pnpm --filter @betterheyboxchat/loader build",
     "dev": "pnpm --filter @betterheyboxchat/loader dev",
-    "bhchat": "pnpm --filter @betterheyboxchat/loader start"
+    "bhchat": "pnpm --filter @betterheyboxchat/loader start",
+    "test": "node scripts/ci-test.mjs"
   },
   "engines": {
     "node": ">=18"
