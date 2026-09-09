@@ -19,11 +19,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile TypeScript
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+      - name: Test installer
+        run: cargo test --manifest-path installer/Cargo.toml
 
       - name: Resolve version
         id: ver
