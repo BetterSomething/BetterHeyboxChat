@@ -61,7 +61,7 @@ export async function installPatches(install: ClientInstall): Promise<void> {
 
   const state = readPatchState(install.appDir);
   if (state.installed) {
-    throw new Error('BetterHeyboxChat 已安装。如需重装请先执行 uninstall。');
+    throw new Error('BetterHeyboxChat 已安装。更新请执行 reinstall。');
   }
 
   const runtimeDir = path.join(install.appDir, 'betterheyboxchat');
@@ -84,6 +84,14 @@ export async function installPatches(install: ClientInstall): Promise<void> {
   };
 
   fs.writeFileSync(path.join(runtimeDir, MANIFEST_FILE), JSON.stringify(manifest, null, 2), 'utf8');
+}
+
+export async function reinstallPatches(install: ClientInstall): Promise<void> {
+  const state = readPatchState(install.appDir);
+  if (state.installed || state.preloadPatched || state.htmlPatched || state.runtimePresent) {
+    await uninstallPatches(install.appDir);
+  }
+  await installPatches(install);
 }
 
 export async function uninstallPatches(appDir: string): Promise<void> {

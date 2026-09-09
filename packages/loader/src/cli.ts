@@ -6,6 +6,7 @@ import {
   formatPatchState,
   installPatches,
   readPatchState,
+  reinstallPatches,
   uninstallPatches,
 } from './patch.js';
 
@@ -64,8 +65,8 @@ program
     console.log('');
 
     if (!options.yes) {
-      console.log('将 patch preload + index.html，并复制运行时到 betterheyboxchat/ 目录。');
-      console.log('请确保黑盒语音已关闭。继续请添加 --yes');
+      console.log('将 patch preload / index.html / index.js，并复制运行时到 betterheyboxchat/ 目录。');
+      console.log('已安装请用 reinstall。请确保黑盒语音已关闭。继续请添加 --yes');
       process.exitCode = 1;
       return;
     }
@@ -74,11 +75,38 @@ program
       await installPatches(install);
       console.log('安装成功。请启动黑盒语音验证注入效果。');
     } catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === 'EPERM') {
-        console.error('写入失败：权限不足。请以管理员身份运行终端后重试。');
-      } else {
-        console.error(error instanceof Error ? error.message : String(error));
-      }
+      printWriteError(error);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command('reinstall')
+  .description('卸载后重新安装补丁与运行时（用于更新）')
+  .option('-p, --path <installRoot>', '手动指定安装根目录')
+  .option('-y, --yes', '跳过确认提示')
+  .action(async (options: { path?: string; yes?: boolean }) => {
+    const install = await detectInstall(options.path);
+    if (!install) {
+      console.error('未找到黑盒语音安装。');
+      process.exitCode = 1;
+      return;
+    }
+
+    console.log(formatInstallSummary(install));
+    console.log('');
+
+    if (!options.yes) {
+      console.log('将先卸载再安装补丁与运行时。请确保黑盒语音已关闭。继续请添加 --yes');
+      process.exitCode = 1;
+      return;
+    }
+
+    try {
+      await reinstallPatches(install);
+      console.log('重装成功。请启动黑盒语音验证注入效果。');
+    } catch (error) {
+      printWriteError(error);
       process.exitCode = 1;
     }
   });
@@ -97,7 +125,7 @@ program
     }
 
     if (!options.yes) {
-      console.log('将还原 preload/index.html 并删除 betterheyboxchat/ 目录。');
+      console.log('将还原 preload / index.html / index.js 并删除 betterheyboxchat/ 目录。');
       console.log('继续请添加 --yes');
       process.exitCode = 1;
       return;
@@ -111,5 +139,13 @@ program
       process.exitCode = 1;
     }
   });
+
+function printWriteError(error: unknown): void {
+  if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'EPERM') {
+    console.error('写入失败：权限不足。请以管理员身份运行终端后重试。');
+    return;
+  }
+  console.error(error instanceof Error ? error.message : String(error));
+}
 
 program.parseAsync(process.argv);
