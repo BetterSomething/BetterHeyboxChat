@@ -2,10 +2,10 @@
 
 > 全局对象：`window.BHChat`  
 > 实现：`runtime/runtime.js`  
-> 兼容客户端：Heybox Chat **1.56.0**  
+> 兼容客户端：Heybox Chat **1.56.0 / 1.57.0**（与安装器 / loader 的 `SUPPORTED_CLIENT_VERSIONS` 对齐）  
 > 写法示例见 [09-plugin-dev.md](./09-plugin-dev.md)
 
-插件只应依赖本页列出的稳定面。`window.__bhchat_require__`、`window.__bhchat_module_map__` 是内部实现，会随版本失效。
+插件只应依赖本页列出的稳定面。`window.__bhchat_require__`、`window.__bhchat_module_map__` 是内部实现，换版本可能失效。同一份插件必须能在兼容表里的**所有**客户端上加载；某一版本没有的 API 要探测后降级，不要写成「仅某某版本」。
 
 ## 元数据
 
@@ -192,6 +192,28 @@ inspect 结果供设置页确认框使用。`desc`/`name`/`author` 已去除 HTM
 
 框架占用的 key：`bhchat.plugins.enabled`、`bhchat.devtools.enabled`、`bhchat.custom_room_bg`。插件请用 `storage.ns(自己的 id)`。
 
+## 子 frame（guest）
+
+跨域 iframe 里的页面插件读不到。主进程只对 **http(s) 子 frame** 执行插件登记的 css/js，不动 `file://` 主页面。Host 白名单与 session cookies 相同：`xiaoheihe.cn`、`*.xiaoheihe.cn`、`max-c.com`、`*.max-c.com`。
+
+| 方法 | 说明 |
+| --- | --- |
+| `BHChat.guest.watch({ id, hostSuffix, css, js })` | 子 frame 导航 / `dom-ready` 时注入。`id` 为 `[a-zA-Z][a-zA-Z0-9_-]{0,63}`；`js`/`css` 各不超过 65536 字。重复 `id` 覆盖 |
+| `BHChat.guest.unwatch(id)` | 取消登记（已注入的节点不会自动撤） |
+| `BHChat.guest.list()` | 当前窗口里已允许的子 frame：`[{ url, origin }]` |
+| `BHChat.guest.run({ urlIncludes, code })` | 对 URL 包含 `urlIncludes` 的子 frame 执行 `code`，返回 `{ ok, ran, results }` |
+
+`watch` 优先于自己听导航再 `run`，避免站点 SPA 跳转赶不上。
+
+## Cookie
+
+| 方法 | 说明 |
+| --- | --- |
+| `BHChat.cookies.get(url?)` | 读当前 session 里该 URL 的 Cookie（白名单同上）。默认 `https://api.xiaoheihe.cn` |
+| `BHChat.cookies.makeEmbeddable({ url })` | 把该 URL 下已有 Cookie 改成 `SameSite=None; Secure`，**不把值回给插件**。返回 `{ ok, changed }` |
+
+`file://` 嵌 `https://` 时 Lax Cookie 可能带不过去，嵌入页面前应先 `makeEmbeddable`。
+
 ## 官方 API 封装
 
 | 属性 | 指向 |
@@ -253,7 +275,7 @@ BHChat.blockUpdate.getStatus()
 BHChat.blockUpdate.ensurePatch()
 ```
 
-`official-room-deco` 启用后挂载（仅 1.56.0；走官方 `uploadCustomFile` + `POST /chatroom/v2/room/decorate`，忽略客户端 `can_change_bg_pic`）：
+`official-room-deco` 启用后挂载（1.56.0 / 1.57.0；走官方 `uploadCustomFile` + `POST /chatroom/v2/room/decorate`，忽略客户端 `can_change_bg_pic`）：
 
 ```javascript
 BHChat.officialRoomDeco.snapshot()
@@ -283,4 +305,4 @@ BHChat.heyboxDevMcp.stop()
 - 事件 handler、`onReady` 回调内的异常只打日志
 - `watch` / `mapState` 在 store 未就绪时降级，不要假设启动瞬间一定有房间数据
 - 设置组件必须 `render(h)`；`template` 会渲染成空白
-- 模块 ID 仅 1.56.0 有效，且不应出现在插件代码里
+- webpack 模块 ID 是内部实现：1.56.0 / 1.57.0 当前相同，但换版本可能变。插件不要写死数字 ID；必须用时先探测导出（如 `typeof api.DC === 'function'`），没有就降级

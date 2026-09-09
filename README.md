@@ -1,12 +1,15 @@
 # BetterHeyboxChat  
 
+[![CI](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/ci.yml/badge.svg)](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/ci.yml)  
 [![Release installer](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/release.yml/badge.svg)](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/release.yml)  
 [![Dev installer](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/dev.yml/badge.svg)](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/dev.yml)  
 ---
 
 [假装这里有个 LOGO, LOGO 位招猪]  
 
-[黑盒语音](https://chat.xiaoheihe.cn/) Windows 客户端增强插件框架
+[黑盒语音](https://chat.xiaoheihe.cn/) Windows 客户端增强插件框架  
+
+当前同时支持黑盒语音 **1.56.0 / 1.57.0**  
 
 ## 安装
 
@@ -37,8 +40,17 @@ pnpm build
 pnpm bhchat detect
 pnpm bhchat status
 pnpm bhchat install --yes
+pnpm bhchat reinstall --yes
 pnpm bhchat uninstall --yes
 ```
+
+已安装过、只想更新运行时时用 `reinstall`（先卸再装）。
+
+```bash
+pnpm test
+```
+
+CI 会跑 TypeScript 编译、`pnpm test` 和 `cargo test` / `cargo build`。
 
 路径不是默认的就加上：
 
@@ -58,6 +70,8 @@ pnpm bhchat install --path "D:\Program Files\Qingfeng\HeyboxChat" --yes
 
 源文件在 `runtime/`  
 `pnpm build` 会复制一份到 `packages/loader/runtime/`
+
+文档、框架代码、插件都按兼容表全版本写，见 [版本兼容](docs/09-plugin-dev.md#版本兼容)
 
 - [怎么写](docs/09-plugin-dev.md)
 - [API](docs/08-plugin-api.md)

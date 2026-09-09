@@ -7,7 +7,7 @@
 
 | 项   | 值                                                      |
 | --- | ------------------------------------------------------ |
-| 客户端 | 黑盒语音 **1.56.0**                                        |
+| 客户端 | 黑盒语音 **1.56.0 / 1.57.0**（须同时兼容，见下方「版本兼容」） |
 | 前端  | Vue **2.7 runtime-only** + Vuex + Webpack              |
 | 注入点 | 渲染进程；不要改主进程 `.jsm`                                     |
 | 调试  | 安装后 `F12` / `Ctrl+Shift+I`；右下角 **BHC vx.x.x** 角标表示 runtime 已加载 |
@@ -46,6 +46,8 @@ BetterHeyboxChat-plugins/your-plugin/
 
 `id` 必须与目录名相同。`author`、`repository`、`desc` 会显示在设置页（仓库可点开）。`desc` 不超过 100 字，不要写 HTML。`enabled` 是默认值；用户可在设置里关掉，写入 `bhchat.plugins.enabled`，**重启后** loader 才跳过脚本。额外脚本写进 `files`，不要写死 `../betterheyboxchat/plugins/...`。
 
+`minClientVersion` 是**下限**，不是「只支持这一版」。兼容表里更新的客户端（现在是 1.57.0）只要不低于下限就会装、会加载。不要无故把下限抬到最新版。
+
 用户插件用设置页「插件市场」从在线货架安装，或导入本地 zip/文件夹。文件写到数据目录（默认 `%APPDATA%\BetterHeyboxChat\plugins\<id>\`）。官方示例与第三方投稿都在独立仓，发 PR 即可。
 
 第三方插件发到独立仓，不要 PR 进框架仓：
@@ -61,6 +63,23 @@ BetterHeyboxChat-plugins/
 在 `registry.json` 的 `plugins` 数组加一行（id 与目录名相同），发 PR。客户端安装时再下载该目录的 `manifest.json`、`entry`、可选 `style` 与 `files`。
 
 调试未发布的货架插件：在设置页「插件市场 → 本地调试」打开开关，填入或选择本地插件仓根目录（须含 `registry.json`，路径可改）。刷新货架 / 安装 / 更新会读这个目录，仍复制到用户插件目录，**重启后生效**。关掉开关即回到在线货架。
+
+## 版本兼容
+
+框架安装器 / loader 的 `SUPPORTED_CLIENT_VERSIONS` 当前是 `1.56.0`、`1.57.0`。**文档、框架代码、货架插件都按「表内全部版本」写**，不要写死「仅 1.56」或「仅 1.57」。
+
+| 方向 | 含义 | 做法 |
+| --- | --- | --- |
+| 向后 | 新代码仍能在更旧的**已支持**客户端上跑 | 新 API / 新 DOM / 新 `$rtc` 方法先 `typeof` 探测，没有就降级或提示，不要假设一定有 |
+| 向前 | 旧插件在更新的**已支持**客户端上仍能加载 | `minClientVersion` 只写真正需要的下限；换版本后核对 webpack ID、选择器、Vuex mutation |
+
+硬规则：
+
+1. 插件优先走 `BHChat` 稳定面（`mapState` / `watch` / EventBus 经框架、`storage`），不要写死 `__bhchat_require__(数字)`。
+2. 必须碰官方模块或 DOM 时：先确认工厂 / 节点 / 函数存在，再调用。参考 `screen-share-danmaku` 对 `$rtc.tryP2PReupgrade` 的处理。
+3. 1.56 是 Electron 33，1.57 是 Electron 43。渲染进程 Node API（`http` / `fs`）两边目前都有，但不要依赖某一 Electron 大版本才有的行为。
+4. 文档写能力时列出**实测过的全部版本**；某一版没有的，写「该版无此 API，已降级」，不要写成整插件不可用。
+5. 兼容表新增版本时：先扩 `SUPPORTED_CLIENT_VERSIONS`，再改文档，再逐个插件核对。
 
 ## 最小插件
 
@@ -166,7 +185,7 @@ BHChat.openSettings('betterheyboxchat');
 
 - 不要改 `ELECTRON_ENV`（`local` 会导致正式包拉调试前端，整窗灰屏）
 - 不要 Proxy / 替换 `electron.BrowserWindow`
-- 不要在 webpack 工厂未就绪时 `__webpack_require__` 官方模块
+- 不要在 webpack 工厂未就绪时 `__webpack_require__` 官方模块；不要把模块数字 ID 写进插件当唯一入口
 - 不要 hook TRTC / 火山 RTC 音频管线
 - 不要伪造服务端协议、破解权限、改 Overlay DLL
 - 不要把异常一路抛到未捕获（可能进官方 Sentry）；包在 `try/catch` 或让 `BHChat.on` 替你吞掉
@@ -201,7 +220,7 @@ BHChat.openSettings('betterheyboxchat');
 官方货架 `official-room-deco`：
 
 - 设置页探测官方全员房间背景写接口；忽略客户端 `can_change_bg_pic` / `room_decorate`
-- 换图走官方 `uploadCustomFile({ source: 'room_deco_pic' })`，保存走 webpack `26737.DC` → `POST /chatroom/v2/room/decorate`（仅 1.56.0）
+- 换图走官方 `uploadCustomFile({ source: 'room_deco_pic' })`，保存走官方 decorate `DC` → `POST /chatroom/v2/room/decorate`（按工厂源码探测 `DC` / `uploadCustomFile`，不写死 webpack 数字 ID）
 - 服务端仍可能拒绝；结果 JSON 打在设置页上
 
 官方货架 `block-update`：

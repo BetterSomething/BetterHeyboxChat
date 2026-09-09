@@ -63,7 +63,7 @@ flowchart TB
 | `main-bridge.js` | F12 / Ctrl+Shift+I；禁止 Proxy 替换 `BrowserWindow` |
 | `preload-bridge.js` | DevTools 开关；**禁止**改 `ELECTRON_ENV` |
 
-模块 ID（1.56.0 / 1.57.0 相同）对插件隐藏，只在 hook 内部使用：`42416` 设置菜单、`93509` UserConfig、`30570` EventBus、`16886` Vuex。
+模块 ID（1.56.0 / 1.57.0 **当前**相同，换版本可能变）对插件隐藏，只在 hook 内部使用：`42416` 设置菜单、`93509` UserConfig、`30570` EventBus、`16886` Vuex。插件走 `BHChat` 稳定面；必须碰官方模块时运行时探测，不要写「仅某某版本」。
 
 ### 3. Preload Bridge
 
@@ -99,6 +99,7 @@ window.BHChat = {
   registerPlugin, getPlugin, listPlugins, isPluginEnabled, setPluginEnabled,
   restart, storage, storage.ns(pluginId),
   electron, overlay, steam, laughter, devtools, openSettings,
+  guest, cookies,
 }
 ```
 
@@ -119,9 +120,9 @@ window.BHChat = {
 | Phase 2 BHChat API、Vuex watch、插件启停、开发文档 | 已完成 |
 | Phase 2 热更新后 patch 完整性校验 | 已落地（main-bridge `ensurePatches` + `BHChat.onClientUpdate`） |
 | Phase 3 在线货架（独立插件仓 `registry.json`） | 已落地（只拉清单，按需下载；市场可改读本地仓） |
-| Phase 3 社区模板、多版本映射 | 未开始 |
+| Phase 3 社区模板、多版本映射 | 1.56 / 1.57 暂共用同一套 ID，未做映射表；兼容约定见 [09-plugin-dev.md](./09-plugin-dev.md)「版本兼容」 |
 
-## 关键 Patch 点（1.56.0）
+## 关键 Patch 点（1.56.0 / 1.57.0，路径相同）
 
 | 文件 | 路径（相对 app 根） | 操作 |
 |------|---------------------|------|
