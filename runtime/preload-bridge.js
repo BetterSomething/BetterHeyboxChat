@@ -183,11 +183,28 @@
         return patchGuard.writeBlockFlags(__dirname, flags);
       },
     },
+    guest: {
+      watch: function (spec) {
+        return ipcRenderer.invoke('bhchat:guest-watch', spec || {});
+      },
+      unwatch: function (id) {
+        return ipcRenderer.invoke('bhchat:guest-unwatch', id);
+      },
+      list: function () {
+        return ipcRenderer.invoke('bhchat:guest-list');
+      },
+      run: function (opts) {
+        return ipcRenderer.invoke('bhchat:guest-run', opts || {});
+      },
+    },
     cookies: {
       get: function (url) {
         return ipcRenderer.invoke('bhchat:get-session-cookies', {
           url: url || 'https://api.xiaoheihe.cn',
         });
+      },
+      makeEmbeddable: function (opts) {
+        return ipcRenderer.invoke('bhchat:cookies-make-embeddable', opts || {});
       },
     },
   };

@@ -270,6 +270,14 @@
     return api[method](arg);
   }
 
+  function callPreloadNs(ns, method, arg) {
+    var api = window.bhchatPreload && window.bhchatPreload[ns];
+    if (!api || typeof api[method] !== 'function') {
+      return Promise.resolve(null);
+    }
+    return api[method](arg);
+  }
+
   var build =
     typeof BHC_BUILD !== 'undefined' && BHC_BUILD
       ? BHC_BUILD
@@ -419,6 +427,30 @@
         } catch (err) {
           return '';
         }
+      },
+    },
+
+    guest: {
+      watch: function (spec) {
+        return callPreloadNs('guest', 'watch', spec);
+      },
+      unwatch: function (id) {
+        return callPreloadNs('guest', 'unwatch', id);
+      },
+      list: function () {
+        return callPreloadNs('guest', 'list');
+      },
+      run: function (opts) {
+        return callPreloadNs('guest', 'run', opts);
+      },
+    },
+
+    cookies: {
+      get: function (url) {
+        return callPreloadNs('cookies', 'get', url);
+      },
+      makeEmbeddable: function (opts) {
+        return callPreloadNs('cookies', 'makeEmbeddable', opts);
       },
     },
 
