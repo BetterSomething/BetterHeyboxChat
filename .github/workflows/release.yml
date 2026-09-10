@@ -80,6 +80,12 @@ jobs:
       - name: Release notes
         run: node scripts/release-notes.mjs --out release-notes.md
 
+      - name: Write update manifest
+        env:
+          ARTIFACT: ${{ steps.buildinfo.outputs.artifact }}
+        shell: pwsh
+        run: node scripts/update-manifest.mjs --artifact $env:ARTIFACT --out update.json
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -90,7 +96,7 @@ jobs:
           gh release view "v$env:VERSION" 2>$null
           if ($LASTEXITCODE -eq 0) {
             gh release edit "v$env:VERSION" --notes-file release-notes.md
-            gh release upload "v$env:VERSION" $env:ARTIFACT --clobber
+            gh release upload "v$env:VERSION" $env:ARTIFACT update.json --clobber
           } else {
-            gh release create "v$env:VERSION" --title $env:VERSION --notes-file release-notes.md --target $env:GITHUB_SHA $env:ARTIFACT
+            gh release create "v$env:VERSION" --title $env:VERSION --notes-file release-notes.md --target $env:GITHUB_SHA $env:ARTIFACT update.json
           }

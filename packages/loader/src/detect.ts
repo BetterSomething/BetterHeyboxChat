@@ -5,8 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import {
-  DEFAULT_INSTALL_CANDIDATES,
   HEYBOX_DISPLAY_NAME_HINTS,
+  PROGRAM_FILES_FOLDERS,
   REGISTRY_APP_PATH_KEYS,
   REGISTRY_UNINSTALL_KEYS,
 } from './constants.js';
@@ -25,6 +25,42 @@ export function stripIconIndex(value: string): string {
   return trimmed;
 }
 
+function heyboxUnder(base: string): string {
+  return path.join(base, 'Qingfeng', 'HeyboxChat');
+}
+
+function pushUniquePath(out: string[], candidate: string) {
+  const key = candidate.toLowerCase();
+  if (!out.some((existing) => existing.toLowerCase() === key)) {
+    out.push(candidate);
+  }
+}
+
+function mountedDriveLetters(): string[] {
+  const out: string[] = [];
+  for (let code = 67; code <= 90; code += 1) {
+    const letter = String.fromCharCode(code);
+    if (fs.existsSync(`${letter}:\\`)) out.push(letter);
+  }
+  return out;
+}
+
+/** 扫本机已挂载盘符上的 Program Files，再加上环境变量里的 Program Files。 */
+export function programFilesHeyboxCandidates(): string[] {
+  const out: string[] = [];
+  for (const envName of ['ProgramFiles', 'ProgramFiles(x86)', 'ProgramW6432']) {
+    const base = process.env[envName];
+    if (base) pushUniquePath(out, heyboxUnder(base));
+  }
+  for (const letter of mountedDriveLetters()) {
+    const drive = `${letter}:\\`;
+    for (const folder of PROGRAM_FILES_FOLDERS) {
+      pushUniquePath(out, heyboxUnder(path.join(drive, folder)));
+    }
+  }
+  return out;
+}
+
 export function defaultInstallFallbacks(): string[] {
   const localBase =
     process.env.LOCALAPPDATA ||
@@ -33,12 +69,10 @@ export function defaultInstallFallbacks(): string[] {
       : '');
   const out: string[] = [];
   if (localBase) {
-    out.push(path.join(localBase, 'Qingfeng', 'HeyboxChat'));
+    pushUniquePath(out, heyboxUnder(localBase));
   }
-  for (const candidate of DEFAULT_INSTALL_CANDIDATES) {
-    if (!out.some((existing) => existing.toLowerCase() === candidate.toLowerCase())) {
-      out.push(candidate);
-    }
+  for (const candidate of programFilesHeyboxCandidates()) {
+    pushUniquePath(out, candidate);
   }
   return out;
 }

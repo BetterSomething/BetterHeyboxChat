@@ -4,13 +4,19 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import {
+  formatUpdateNotes,
   installerArtifactName,
   isSemver,
   pickReleaseTag,
+  renderUpdateJson,
   resolveBuild,
   stripV,
 } from './lib/versioning.mjs';
+
+const require = createRequire(import.meta.url);
+const selfUpdate = require('../runtime/lib/self-update.js');
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const patchJs = path.join(root, 'packages/loader/dist/patch.js');
@@ -36,6 +42,73 @@ function testVersioning() {
   assert(dev.version === 'c73b142' && dev.channel === 'dev', '短 SHA 应走开发版');
 
   assert(pickReleaseTag(['v0.1.0', 'v0.2.0', 'dev']) === 'v0.2.0', '应取最大 semver tag');
+
+  const notes = formatUpdateNotes([
+    'docs: skip',
+    'feat(runtime): 兼容 1.57.0',
+    'fix(installer): 自动提权',
+    'perf: 降内存',
+    'feat: 第二项',
+    'feat: 第三项',
+    'feat: 第四项',
+    'chore: ignore',
+    'feat: 第五项多余',
+  ]);
+  assert(notes.includes('兼容 1.57.0'), '摘要应去掉 feat 前缀');
+  assert(notes.includes('第五项多余'), 'feat 优先占满 5 条');
+  assert(notes.includes('另有 2 条，见完整说明'), 'fix/perf 超出应计入其余');
+  assert(!notes.includes('feat('), '摘要不应保留 conventional 前缀');
+
+  const manifest = JSON.parse(renderUpdateJson({
+    build: { version: '1.1.0', channel: 'release', commit: 'abc1234' },
+    sha256: 'SHA256:ABCD',
+    notes: 'hello',
+    publishedAt: '2026-09-10T00:00:00Z',
+  }));
+  assert(manifest.tag === 'v1.1.0' && manifest.artifact === 'bhchat-installer-1.1.0.exe', '正式版清单');
+  assert(manifest.sha256 === 'abcd', 'sha256 应小写并去掉前缀');
+}
+
+function testSelfUpdateCompare() {
+  assert(
+    selfUpdate.hasUpdate({ channel: 'release', version: '1.0.0' }, { version: '1.1.0' }),
+    '正式版应识别更新',
+  );
+  assert(
+    !selfUpdate.hasUpdate({ channel: 'release', version: '1.1.0' }, { version: '1.0.0' }),
+    '正式版不应降级',
+  );
+  assert(
+    selfUpdate.hasUpdate({ channel: 'release', version: 'a4c21a4' }, { version: '1.0.0' }),
+    '本机非正式 semver 应当成需要更新',
+  );
+  assert(
+    !selfUpdate.hasUpdate(
+      { channel: 'dev', version: 'a4c21a4' },
+      { version: 'a4c21a41d3affce' },
+    ),
+    '开发版短 SHA 前缀相同则已最新',
+  );
+  assert(
+    selfUpdate.hasUpdate({ channel: 'dev', version: 'a4c21a4' }, { version: '085340d' }),
+    '开发版 SHA 不同则有更新',
+  );
+  assert(
+    selfUpdate.isIgnored({ channel: 'dev', version: '085340d' }, { channel: 'dev', version: '085340d' }),
+    '忽略应匹配通道+版本',
+  );
+  const parsed = selfUpdate.parseManifest({
+    version: '1.1.0',
+    channel: 'release',
+    artifact: 'bhchat-installer-1.1.0.exe',
+    sha256: 'SHA256:ABCD',
+  });
+  assert(parsed.ok && parsed.manifest.sha256 === 'abcd', '清单应洗白 sha256');
+  assert(
+    selfUpdate.resolveInstallRoot('D:/x/1.57.0/resources/versions/1.57.0/app').replace(/\\/g, '/')
+      === 'D:/x',
+    '安装根应从 app 上推到黑盒安装根',
+  );
 }
 
 function testCliHelp() {
@@ -98,6 +171,7 @@ async function testReinstall() {
 
 const steps = [
   ['versioning', testVersioning],
+  ['self-update-compare', testSelfUpdateCompare],
   ['cli-help', testCliHelp],
   ['reinstall', testReinstall],
 ];

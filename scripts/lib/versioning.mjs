@@ -153,3 +153,39 @@ export function renderVersionJson(build) {
     2,
   ) + '\n';
 }
+
+export function formatUpdateNotes(subjects) {
+  const order = ['feat', 'fix', 'perf'];
+  const picked = [];
+  for (const line of subjects || []) {
+    const parsed = parseCommitSubject(line);
+    if (!parsed || !order.includes(parsed.type)) continue;
+    picked.push(parsed);
+  }
+  picked.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
+  const extra = Math.max(0, picked.length - 5);
+  const lines = picked.slice(0, 5).map((item) => String(item.subject || '').trim()).filter(Boolean);
+  if (extra > 0) lines.push(`另有 ${extra} 条，见完整说明`);
+  let notes = lines.join('\n');
+  if (notes.length > 400) notes = `${notes.slice(0, 397)}...`;
+  return notes;
+}
+
+export function renderUpdateJson({ build, sha256, notes, publishedAt, tag }) {
+  const channel = build.channel === 'release' ? 'release' : 'dev';
+  const version = String(build.version || '').trim();
+  return JSON.stringify(
+    {
+      version,
+      channel,
+      commit: String(build.commit || version).trim(),
+      tag: tag || (channel === 'release' ? `v${version}` : 'dev'),
+      artifact: installerArtifactName(version),
+      sha256: String(sha256 || '').trim().toLowerCase().replace(/^sha256:/, ''),
+      notes: String(notes || ''),
+      publishedAt: publishedAt || new Date().toISOString(),
+    },
+    null,
+    2,
+  ) + '\n';
+}

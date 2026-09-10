@@ -62,6 +62,12 @@ jobs:
       - name: Release notes
         run: node scripts/release-notes.mjs --out release-notes.md
 
+      - name: Write update manifest
+        env:
+          ARTIFACT: ${{ steps.ver.outputs.artifact }}
+        shell: pwsh
+        run: node scripts/update-manifest.mjs --artifact $env:ARTIFACT --out update.json
+
       - name: Publish rolling dev pre-release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -72,4 +78,4 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
             gh release delete dev --cleanup-tag --yes
           }
-          gh release create dev --prerelease --title "dev" --notes-file release-notes.md --target $env:GITHUB_SHA $env:ARTIFACT
+          gh release create dev --prerelease --title "dev" --notes-file release-notes.md --target $env:GITHUB_SHA $env:ARTIFACT update.json

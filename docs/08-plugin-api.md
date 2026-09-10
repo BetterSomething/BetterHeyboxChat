@@ -18,6 +18,20 @@
 | `BHChat.indicator.isVisible()` | `boolean` | 右下角角标是否显示（正式版 `BHC v0.1.0`，开发版 `BHC c357f16`） |
 | `BHChat.indicator.setVisible(on)` | `Promise<{visible}>` | 显示/隐藏角标，写入 `bhchat.indicator.visible` |
 
+### `BHChat.update`
+
+框架本体检查更新。设置里可选跟踪「开发版」或「正式版」（默认跟随本机 `BHChat.channel`）。正式版比 Latest semver，开发版比 `dev` 短 SHA。清单和安装包走插件市场加速源 + GitHub `releases/download`，不代打 `api.github.com`。
+
+| 方法 | 说明 |
+| --- | --- |
+| `check({ manual }?)` | 拉清单并比较。启动自动检查失败不弹。`action` 为 `dialog` / `auto` / `none` |
+| `apply(remote)` | 下载安装包、校验 sha256、拉起 `bhchat-installer.exe --reinstall --yes` |
+| `ignore(remote)` | 记下通道+版本，同版本不再弹、不自动装 |
+| `getSettings()` / `setMode(mode)` / `setChannel(channel)` | `mode` 为 `notify`（默认）/ `quiet` / `auto`；`channel` 为 `dev` / `release` |
+| `lastResult()` | 最近一次检查结果 |
+
+配置在 `bhchat.update`。语音或屏幕共享进行中，`auto` 改弹窗。
+
 ## 生命周期
 
 ### `onReady(cb)`

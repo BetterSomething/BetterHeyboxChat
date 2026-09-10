@@ -24,7 +24,7 @@ program
   .action(async (options: { path?: string }) => {
     const install = await detectInstall(options.path);
     if (!install) {
-      console.error('未找到黑盒语音安装。可尝试: bhchat detect --path "D:\\Program Files\\Qingfeng\\HeyboxChat"');
+      console.error('未找到黑盒语音安装。可用 --path 指定安装根目录。');
       process.exitCode = 1;
       return;
     }

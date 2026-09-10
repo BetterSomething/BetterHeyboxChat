@@ -88,6 +88,7 @@
 
   var pluginStore = require('./lib/plugin-store.js');
   var patchGuard = require('./lib/patch-guard.js');
+  var selfUpdate = require('./lib/self-update.js');
   var APP_DIR = path.join(__dirname, '..');
   var build = { version: 'dev', channel: 'dev', commit: 'unknown' };
   try {
@@ -173,6 +174,29 @@
       },
       ensure: function () {
         return patchGuard.ensurePatches(APP_DIR);
+      },
+    },
+    update: {
+      fetchManifest: function (opts) {
+        return selfUpdate.fetchManifest(opts || {});
+      },
+      downloadInstaller: function (opts) {
+        return selfUpdate.downloadInstaller(opts || {});
+      },
+      launchInstaller: function (exePath, installRoot) {
+        return selfUpdate.launchInstaller(exePath, installRoot);
+      },
+      cleanupOldInstallers: function (keepName) {
+        return selfUpdate.cleanupOldInstallers(keepName);
+      },
+      resolveInstallRoot: function () {
+        return selfUpdate.resolveInstallRoot(APP_DIR);
+      },
+      hasUpdate: function (local, remote) {
+        return selfUpdate.hasUpdate(local, remote);
+      },
+      isIgnored: function (ignored, remote) {
+        return selfUpdate.isIgnored(ignored, remote);
       },
     },
     updateBlock: {

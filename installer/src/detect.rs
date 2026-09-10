@@ -1,4 +1,4 @@
-use crate::constants::{DEFAULT_INSTALL_CANDIDATES, HEYBOX_DISPLAY_NAME_HINTS};
+use crate::constants::HEYBOX_DISPLAY_NAME_HINTS;
 use crate::path_util::normalize_path;
 use crate::types::{ClientInstall, PackageJson};
 use std::fs;
@@ -15,18 +15,68 @@ pub fn local_appdata_dir() -> Option<PathBuf> {
         })
 }
 
-/// 官方默认安装目录：`%LOCALAPPDATA%\Qingfeng\HeyboxChat`，其后是 Program Files 候选。
+const PROGRAM_FILES_FOLDERS: &[&str] = &["Program Files", "Program Files (x86)"];
+
+fn push_unique_path(out: &mut Vec<PathBuf>, path: PathBuf) {
+    let key = path.to_string_lossy().to_lowercase();
+    if !out
+        .iter()
+        .any(|existing| existing.to_string_lossy().to_lowercase() == key)
+    {
+        out.push(path);
+    }
+}
+
+fn heybox_under(base: &Path) -> PathBuf {
+    base.join("Qingfeng").join("HeyboxChat")
+}
+
+fn mounted_drive_letters() -> Vec<char> {
+    #[cfg(windows)]
+    {
+        extern "system" {
+            fn GetLogicalDrives() -> u32;
+        }
+        let mask = unsafe { GetLogicalDrives() };
+        return (0..26)
+            .filter(|i| mask & (1 << i) != 0)
+            .map(|i| (b'A' + i) as char)
+            .collect();
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+/// 扫本机已挂载盘符上的 `Program Files\Qingfeng\HeyboxChat`，再加上环境变量里的 Program Files。
+pub fn program_files_heybox_candidates() -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for var in ["ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"] {
+        if let Some(base) = std::env::var_os(var).filter(|v| !v.is_empty()) {
+            push_unique_path(&mut out, heybox_under(Path::new(&base)));
+        }
+    }
+    for letter in mounted_drive_letters() {
+        let drive = PathBuf::from(format!("{letter}:\\"));
+        if !drive.is_dir() {
+            continue;
+        }
+        for folder in PROGRAM_FILES_FOLDERS {
+            push_unique_path(&mut out, heybox_under(&drive.join(folder)));
+        }
+    }
+    out
+}
+
+/// 官方默认安装目录：`%LOCALAPPDATA%\Qingfeng\HeyboxChat`，其后是本机探测到的 Program Files。
 pub fn default_install_fallbacks() -> Vec<PathBuf> {
     let mut out = Vec::new();
     if let Some(local) = local_appdata_dir() {
-        out.push(local.join("Qingfeng").join("HeyboxChat"));
+        push_unique_path(&mut out, heybox_under(&local));
     }
-    for candidate in DEFAULT_INSTALL_CANDIDATES {
-        let path = PathBuf::from(*candidate);
-        let key = path.to_string_lossy().to_lowercase();
-        if !out.iter().any(|existing| existing.to_string_lossy().to_lowercase() == key) {
-            out.push(path);
-        }
+    for candidate in program_files_heybox_candidates() {
+        push_unique_path(&mut out, candidate);
     }
     out
 }

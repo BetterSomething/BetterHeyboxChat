@@ -1,5 +1,6 @@
 mod constants;
 mod client;
+mod cli;
 mod detect;
 mod elevate;
 mod fonts;
@@ -12,6 +13,8 @@ mod app;
 mod ui;
 
 use app::InstallerApp;
+use detect::detect_install;
+use patch::reinstall_patches_managed;
 
 fn viewport() -> egui::ViewportBuilder {
     egui::ViewportBuilder::default()
@@ -37,11 +40,34 @@ fn run(renderer: eframe::Renderer) -> eframe::Result<()> {
     )
 }
 
+fn silent_reinstall(path: Option<std::path::PathBuf>) -> eframe::Result<()> {
+    let install = detect_install(path.as_deref());
+    let Some(install) = install else {
+        eprintln!("未找到黑盒语音安装，请用 --path 指定安装根目录。");
+        std::process::exit(2);
+    };
+    match reinstall_patches_managed(&install) {
+        Ok(msg) => {
+            println!("{msg}");
+            Ok(())
+        }
+        Err(err) => {
+            eprintln!("{err}");
+            std::process::exit(1);
+        }
+    }
+}
+
 fn main() -> eframe::Result<()> {
+    let args = cli::parse_args(std::env::args());
     if elevate::should_auto_elevate(elevate::is_admin(), elevate::already_attempted_elevate()) {
         if elevate::request_admin_relaunch() {
             return Ok(());
         }
+    }
+
+    if cli::wants_silent_reinstall(&args) {
+        return silent_reinstall(args.path);
     }
 
     // Windows 上 glow/OpenGL 经常拿到 1.1 上下文（远程桌面、管理员会话、驱动异常），

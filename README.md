@@ -53,7 +53,7 @@ CI 会跑 TypeScript 编译、`pnpm test` 和 `cargo test` / `cargo build`。
 路径不是默认的就加上：
 
 ```bash
-pnpm bhchat install --path "D:\Program Files\Qingfeng\HeyboxChat" --yes
+pnpm bhchat install --path "<黑盒语音安装根目录>" --yes
 ```
 
 ### 发版

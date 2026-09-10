@@ -26,6 +26,27 @@
     ]);
   }
 
+  function hSelect(h, value, options, onChange) {
+    return h(
+      'select',
+      {
+        class: 'bhchat-native-select',
+        domProps: { value: value },
+        on: {
+          click: function (e) {
+            if (e && e.stopPropagation) e.stopPropagation();
+          },
+          change: function (e) {
+            onChange(e && e.target ? e.target.value : value);
+          },
+        },
+      },
+      (options || []).map(function (opt) {
+        return h('option', { attrs: { value: opt.id } }, opt.label);
+      }),
+    );
+  }
+
   function hBtn(h, text, kind, onClick, disabled) {
     return h(
       'button',
@@ -110,6 +131,13 @@
           devToolsEnabled: true,
           devToolsStatus: '',
           indicatorVisible: true,
+          updateMode: 'notify',
+          updateChannel: 'dev',
+          updateStatus: '',
+          updateRemote: null,
+          updateAvailable: false,
+          updateIgnored: false,
+          updateChecking: false,
         };
       },
       computed: {
@@ -127,9 +155,11 @@
         this.refresh();
         this.refreshDevTools();
         this.refreshIndicator();
+        this.refreshUpdate();
         if (window.BHChat && window.BHChat.on) {
           window.BHChat.on('panel-registered', this.refreshPanels);
           window.BHChat.on('plugin-enabled-changed', this.refreshPlugins);
+          window.BHChat.on('self-update', this.onSelfUpdateResult);
         }
         this._onRestartKey = function (e) {
           if (e && e.key === 'Escape' && self.restartDialog) self.onCancelRestart();
@@ -140,11 +170,13 @@
         this.refresh();
         this.refreshDevTools();
         this.refreshIndicator();
+        this.refreshUpdate();
       },
       beforeDestroy: function () {
         if (window.BHChat && window.BHChat.off) {
           window.BHChat.off('panel-registered', this.refreshPanels);
           window.BHChat.off('plugin-enabled-changed', this.refreshPlugins);
+          window.BHChat.off('self-update', this.onSelfUpdateResult);
         }
         if (this._onRestartKey) document.removeEventListener('keydown', this._onRestartKey);
       },
@@ -223,6 +255,79 @@
           var api = window.BHChat && window.BHChat.indicator;
           if (!api || typeof api.isVisible !== 'function') return;
           this.indicatorVisible = !!api.isVisible();
+        },
+        refreshUpdate: function () {
+          var api = window.BHChat && window.BHChat.update;
+          var self = this;
+          if (!api || typeof api.getSettings !== 'function') return;
+          Promise.resolve(api.getSettings()).then(function (settings) {
+            self.updateMode = settings && settings.mode ? settings.mode : 'notify';
+            self.updateChannel =
+              settings && settings.channel === 'release' ? 'release' : 'dev';
+          });
+          var last = api.lastResult && api.lastResult();
+          if (last) this.onSelfUpdateResult(last);
+        },
+        onSelfUpdateResult: function (result) {
+          if (!result) return;
+          this.updateAvailable = !!result.available;
+          this.updateIgnored = !!result.ignored;
+          this.updateRemote = result.remote || null;
+          this.updateChecking = false;
+          if (!result.ok) {
+            this.updateStatus = result.error || '检查更新失败';
+            return;
+          }
+          if (!result.available) {
+            this.updateStatus = '已是最新';
+            return;
+          }
+          var ver = result.remote && result.remote.version ? result.remote.version : '';
+          this.updateStatus = result.ignored ? '已忽略 ' + ver : '有更新 ' + ver;
+        },
+        onSetUpdateMode: function (mode) {
+          var api = window.BHChat && window.BHChat.update;
+          if (!api || typeof api.setMode !== 'function') return;
+          var self = this;
+          Promise.resolve(api.setMode(mode)).then(function (settings) {
+            self.updateMode = settings && settings.mode ? settings.mode : mode;
+          });
+        },
+        onSetUpdateChannel: function (channel) {
+          var api = window.BHChat && window.BHChat.update;
+          if (!api || typeof api.setChannel !== 'function') return;
+          var self = this;
+          Promise.resolve(api.setChannel(channel)).then(function (settings) {
+            self.updateChannel = settings && settings.channel === 'release' ? 'release' : 'dev';
+            self.updateStatus = '正在检查…';
+            return api.check({ manual: true });
+          }).then(function (result) {
+            if (result) self.onSelfUpdateResult(result);
+          });
+        },
+        onCheckUpdate: function () {
+          var api = window.BHChat && window.BHChat.update;
+          if (!api) return;
+          var self = this;
+          this.updateChecking = true;
+          this.updateStatus = '正在检查…';
+          Promise.resolve(api.check({ manual: true }))
+            .then(function (result) {
+              self.onSelfUpdateResult(result);
+            })
+            .catch(function (err) {
+              self.updateChecking = false;
+              self.updateStatus = (err && err.message) || '检查更新失败';
+            });
+        },
+        onApplyUpdate: function () {
+          var api = window.BHChat && window.BHChat.update;
+          if (!api || !this.updateRemote) return;
+          var self = this;
+          this.updateStatus = '正在下载…';
+          Promise.resolve(api.apply(this.updateRemote)).catch(function (err) {
+            self.updateStatus = (err && err.message) || '下载失败';
+          });
         },
         onToggleIndicator: function () {
           var api = window.BHChat && window.BHChat.indicator;
@@ -419,6 +524,45 @@
                 { class: 'row bhchat-row-click', on: { click: this.onToggleIndicator } },
                 [h('span', '显示角标'), hSwitch(h, this.indicatorVisible)],
               ),
+              h('div', { class: 'row' }, [
+                h('span', '更新通道'),
+                hSelect(
+                  h,
+                  this.updateChannel,
+                  [
+                    { id: 'dev', label: '开发版' },
+                    { id: 'release', label: '正式版' },
+                  ],
+                  function (value) {
+                    self.onSetUpdateChannel(value);
+                  },
+                ),
+              ]),
+              h('div', { class: 'row' }, [
+                h('span', '检查更新'),
+                hSelect(
+                  h,
+                  this.updateMode,
+                  [
+                    { id: 'notify', label: '检查并弹窗' },
+                    { id: 'quiet', label: '检查但不弹窗' },
+                    { id: 'auto', label: '检查并自动安装' },
+                  ],
+                  function (value) {
+                    self.onSetUpdateMode(value);
+                  },
+                ),
+              ]),
+              h('div', { class: 'row' }, [
+                h('span', '远端'),
+                h('span', { class: 'bhchat-row-value' }, this.updateStatus || '未检查'),
+              ]),
+            ]),
+            h('div', { class: 'bhchat-actions' }, [
+              hBtn(h, this.updateChecking ? '检查中…' : '立即检查', 'secondary', this.onCheckUpdate, this.updateChecking),
+              this.updateAvailable
+                ? hBtn(h, '下载并安装', 'primary', this.onApplyUpdate)
+                : null,
             ]),
           ]),
           h('div', { class: 'cell' }, pluginChildren),
@@ -457,14 +601,15 @@
       '.betterheyboxchat-setting-block .bhchat-admin-tip{margin:8px 0 0;font-size:13px;font-weight:700;line-height:20px;background-image:linear-gradient(90deg,#ed286b 0%,#e69e23 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}',
       '.betterheyboxchat-setting-block .bhchat-hint+.bhchat-list,.betterheyboxchat-setting-block .cell-title+.bhchat-list{margin-top:0}',
       '.betterheyboxchat-setting-block .bhchat-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 0 4px}',
-      '.betterheyboxchat-setting-block .bhchat-btn{appearance:none;-webkit-appearance:none;display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;border:none;border-radius:5px;font-family:inherit;font-size:14px;font-weight:700;line-height:18px;letter-spacing:.01em;cursor:pointer;user-select:none}',
-      '.betterheyboxchat-setting-block .bhchat-btn-primary{background:var(--brand-fill,#2d7d46);color:#fff}',
-      '.betterheyboxchat-setting-block .bhchat-btn-primary:hover{filter:brightness(1.08)}',
-      '.betterheyboxchat-setting-block .bhchat-btn-secondary{background:var(--fill-button,#4f545c);color:var(--text-1,#f2f3f5)}',
-      '.betterheyboxchat-setting-block .bhchat-btn-secondary:hover{filter:brightness(1.08)}',
-      '.betterheyboxchat-setting-block .bhchat-btn-danger{background:var(--f-error-fill,#d83c3f);color:#fff}',
-      '.betterheyboxchat-setting-block .bhchat-btn-danger:hover{filter:brightness(1.08)}',
-      '.betterheyboxchat-setting-block .bhchat-btn.is-disabled,.betterheyboxchat-setting-block .bhchat-btn:disabled{opacity:.4;cursor:not-allowed;filter:none}',
+      '.bhchat-btn{appearance:none;-webkit-appearance:none;display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 16px;border:none;border-radius:5px;font-family:inherit;font-size:14px;font-weight:700;line-height:18px;letter-spacing:.01em;cursor:pointer;user-select:none}',
+      '.bhchat-btn-primary{background:var(--brand-fill,#2d7d46);color:#fff}',
+      '.bhchat-btn-primary:hover{filter:brightness(1.08)}',
+      '.bhchat-btn-secondary{background:var(--fill-button,#4f545c);color:var(--text-1,#f2f3f5)}',
+      'html[theme=light] .bhchat-btn-secondary,body[theme=light] .bhchat-btn-secondary{background:var(--fill-button,#e4e6eb);color:var(--text-1,#32373c)}',
+      '.bhchat-btn-secondary:hover{filter:brightness(1.08)}',
+      '.bhchat-btn-danger{background:var(--f-error-fill,#d83c3f);color:#fff}',
+      '.bhchat-btn-danger:hover{filter:brightness(1.08)}',
+      '.bhchat-btn.is-disabled,.bhchat-btn:disabled{opacity:.4;cursor:not-allowed;filter:none}',
       '.betterheyboxchat-setting-block .bhchat-switch{width:26px;height:16px;flex-shrink:0;display:inline-block;position:relative}',
       '.betterheyboxchat-setting-block .bhchat-switch-core{display:block;width:100%;height:100%;border-radius:11px;background:rgba(0,0,0,.28);position:relative;transition:background-color .2s}',
       '.betterheyboxchat-setting-block .bhchat-switch-core:after{content:"";position:absolute;width:12px;height:12px;top:2px;left:2px;border-radius:50%;background:var(--text-3,#8b8e93);transition:left .2s,background-color .2s}',
@@ -475,7 +620,12 @@
       '.betterheyboxchat-setting-block .bhchat-radio.on:after{content:"";position:absolute;width:8px;height:8px;left:2px;top:2px;background:var(--brand-text,#7dd95e);border-radius:50%}',
       '.betterheyboxchat-setting-block .bhchat-field{display:flex;flex-direction:column;align-items:stretch;gap:6px;margin:8px 0}',
       '.betterheyboxchat-setting-block .bhchat-field-label{font-size:12px;line-height:20px;color:var(--text-3,#8b8e93)}',
-      '.betterheyboxchat-setting-block .bhchat-native-input{width:100%;box-sizing:border-box;height:32px;padding:0 10px;border:none;border-radius:5px;background:var(--opacity-1,rgba(0,0,0,.2));color:var(--text-1,#f2f3f5);font-size:13px;outline:none}',
+      '.betterheyboxchat-setting-block .bhchat-native-select{appearance:none;-webkit-appearance:none;height:28px;max-width:168px;padding:0 28px 0 10px;border:none;border-radius:5px;background:var(--opacity-1,rgba(0,0,0,.2)) url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'%3E%3Cpath fill=\'%238b8e93\' d=\'M1 1l4 4 4-4\'/%3E%3C/svg%3E") no-repeat right 10px center;color:var(--text-1,#f2f3f5);font-size:13px;line-height:28px;outline:none;cursor:pointer;color-scheme:dark}',
+      '.betterheyboxchat-setting-block .bhchat-native-select option{color:CanvasText;background-color:Canvas}',
+      'html[theme=light] .betterheyboxchat-setting-block .bhchat-native-select,body[theme=light] .betterheyboxchat-setting-block .bhchat-native-select{color:var(--text-1,#32373c);color-scheme:light}',
+      '.betterheyboxchat-setting-block .bhchat-native-select:focus{box-shadow:0 0 0 1px var(--brand-text,#7dd95e)}',
+      '.betterheyboxchat-setting-block .bhchat-native-input{width:100%;box-sizing:border-box;height:32px;padding:0 10px;border:none;border-radius:5px;background:var(--opacity-1,rgba(0,0,0,.2));color:var(--text-1,#f2f3f5);font-size:13px;outline:none;color-scheme:dark}',
+      'html[theme=light] .betterheyboxchat-setting-block .bhchat-native-input,body[theme=light] .betterheyboxchat-setting-block .bhchat-native-input{color:var(--text-1,#32373c);color-scheme:light}',
       '.betterheyboxchat-setting-block .bhchat-native-input:focus{box-shadow:0 0 0 1px var(--brand-text,#7dd95e)}',
       '.betterheyboxchat-setting-block .bhchat-native-input:disabled{opacity:.5}',
       '.betterheyboxchat-setting-block .bhchat-input-compact{width:80px;flex:none;text-align:center;padding:0 8px}',
@@ -496,6 +646,22 @@
       '.bhchat-dialog-desc{margin:4px 0 0;font-size:13px;line-height:20px;color:var(--text-2,#d2d3d7);white-space:pre-wrap;word-break:break-word}',
       'html[theme=light] .bhchat-dialog-desc,body[theme=light] .bhchat-dialog-desc{color:var(--text-2,#32373c)}',
       '.bhchat-dialog-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:16px 0 0}',
+      '.bhchat-update-mask{position:fixed;inset:0;z-index:13000;display:flex;align-items:center;justify-content:center;background:var(--opacity-s5,rgba(0,0,0,.7))}',
+      '.bhchat-update-dialog{width:416px;max-width:calc(100vw - 48px);max-height:calc(100vh - 100px);padding:24px 0;border-radius:12px;background:var(--fill-1,#36393e);color:var(--text-1,#fff);display:flex;flex-direction:column}',
+      'html[theme=light] .bhchat-update-dialog,body[theme=light] .bhchat-update-dialog{background:var(--fill-1,#fff);color:var(--text-1,#000)}',
+      '.bhchat-update-dialog .dialog-title-group{margin-top:-24px;padding:24px 24px 12px;border-radius:12px 12px 0 0;background:var(--brand-h,#2d7d46);flex-shrink:0}',
+      '.bhchat-update-dialog .dialog-title-group .title{font-weight:700;font-size:16px;line-height:22px;color:#fff}',
+      '.bhchat-update-dialog .dialog-title-group .desc{margin-top:6px;font-size:13px;line-height:18px;color:hsla(0,0%,100%,.5)}',
+      '.bhchat-update-dialog .slot-wrapper{padding:16px 24px 0;overflow-y:auto;min-height:0;flex:1;scrollbar-width:thin;scrollbar-color:var(--opacity-3,rgba(255,255,255,.28)) transparent}',
+      '.bhchat-update-dialog .slot-wrapper::-webkit-scrollbar{display:block;width:6px}',
+      '.bhchat-update-dialog .slot-wrapper::-webkit-scrollbar-track{background:transparent}',
+      '.bhchat-update-dialog .slot-wrapper::-webkit-scrollbar-thumb{background:var(--opacity-3,rgba(255,255,255,.28));border-radius:3px}',
+      'html[theme=light] .bhchat-update-dialog .slot-wrapper,body[theme=light] .bhchat-update-dialog .slot-wrapper{scrollbar-color:var(--opacity-3,rgba(0,0,0,.28)) transparent}',
+      'html[theme=light] .bhchat-update-dialog .slot-wrapper::-webkit-scrollbar-thumb,body[theme=light] .bhchat-update-dialog .slot-wrapper::-webkit-scrollbar-thumb{background:var(--opacity-3,rgba(0,0,0,.28))}',
+      '.bhchat-update-dialog .content{margin:0;font-weight:400;font-size:14px;line-height:24px;letter-spacing:.04em;color:var(--text-2,#d2d3d7);white-space:pre-wrap;word-break:break-word}',
+      'html[theme=light] .bhchat-update-dialog .content,body[theme=light] .bhchat-update-dialog .content{color:var(--text-2,#32373c)}',
+      '.bhchat-update-dialog .btn-wrapper{width:100%;min-height:42px;margin-top:20px;display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:0 24px;flex-shrink:0;flex-wrap:wrap}',
+      '.bhchat-update-dialog .btn-wrapper .bhchat-btn{min-width:96px}',
     ].join('');
     document.head.appendChild(style);
   }
@@ -732,6 +898,147 @@
   }
 
   setInterval(mountSettingsFallback, 400);
+
+  function injectUpdateDialogStyles() {
+    injectNativeStyles();
+  }
+
+  function attachSelfUpdateUi() {
+    if (window.__bhchat_update_ui__) return;
+    if (!window.BHChat || typeof window.BHChat.on !== 'function') return;
+    window.__bhchat_update_ui__ = true;
+    injectUpdateDialogStyles();
+
+    var state = { result: null, applying: false, percent: 0, error: '' };
+
+    function host() {
+      var el = document.getElementById('bhchat-update-host');
+      if (el) return el;
+      el = document.createElement('div');
+      el.id = 'bhchat-update-host';
+      document.body.appendChild(el);
+      return el;
+    }
+
+    function closeDialog() {
+      state.result = null;
+      state.applying = false;
+      state.percent = 0;
+      state.error = '';
+      var el = document.getElementById('bhchat-update-host');
+      if (el) el.innerHTML = '';
+    }
+
+    function setDisabled(disabled) {
+      var buttons = host().querySelectorAll('button');
+      for (var i = 0; i < buttons.length; i++) buttons[i].disabled = !!disabled;
+    }
+
+    function renderDialog() {
+      var result = state.result;
+      if (!result || !result.remote) {
+        closeDialog();
+        return;
+      }
+      injectUpdateDialogStyles();
+      var remote = result.remote;
+      var title = state.applying
+        ? '正在下载 (' + state.percent + '%)'
+        : '发现新版本 (' + remote.version + ')';
+      var notes = state.error || remote.notes || 'BetterHeyboxChat 有可用更新';
+      var root = host();
+      root.innerHTML = '';
+      var mask = document.createElement('div');
+      mask.className = 'bhchat-update-mask';
+      var dialog = document.createElement('div');
+      dialog.className = 'bhchat-update-dialog';
+      dialog.addEventListener('click', function (e) {
+        if (e && e.stopPropagation) e.stopPropagation();
+      });
+      var head = document.createElement('div');
+      head.className = 'dialog-title-group';
+      head.innerHTML =
+        '<div class="title"></div><div class="desc">BetterHeyboxChat 有可用更新</div>';
+      head.querySelector('.title').textContent = title;
+      var slot = document.createElement('div');
+      slot.className = 'slot-wrapper';
+      var content = document.createElement('p');
+      content.className = 'content';
+      content.textContent = notes;
+      slot.appendChild(content);
+      var btns = document.createElement('div');
+      btns.className = 'btn-wrapper';
+
+      function makeBtn(label, kind, onClick) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'bhchat-btn bhchat-btn-' + kind;
+        btn.textContent = label;
+        btn.disabled = !!state.applying;
+        btn.addEventListener('click', onClick);
+        return btn;
+      }
+
+      btns.appendChild(
+        makeBtn('忽略此版本', 'secondary', function () {
+          if (state.applying) return;
+          if (window.BHChat.update && window.BHChat.update.ignore) {
+            window.BHChat.update.ignore(remote);
+          }
+          closeDialog();
+        }),
+      );
+      btns.appendChild(
+        makeBtn('稍后', 'secondary', function () {
+          if (state.applying) return;
+          closeDialog();
+        }),
+      );
+      btns.appendChild(
+        makeBtn('下载并安装', 'primary', function () {
+          if (state.applying || !window.BHChat.update) return;
+          state.applying = true;
+          state.error = '';
+          renderDialog();
+          Promise.resolve(window.BHChat.update.apply(remote)).catch(function (err) {
+            state.applying = false;
+            state.error = (err && err.message) || '下载失败';
+            renderDialog();
+          });
+        }),
+      );
+
+      dialog.appendChild(head);
+      dialog.appendChild(slot);
+      dialog.appendChild(btns);
+      mask.appendChild(dialog);
+      root.appendChild(mask);
+      setDisabled(state.applying);
+    }
+
+    window.BHChat.on('self-update', function (result) {
+      if (!result || result.action !== 'dialog' || !result.available || result.ignored) return;
+      state.result = result;
+      state.applying = false;
+      state.percent = 0;
+      state.error = result.error || '';
+      renderDialog();
+    });
+    window.BHChat.on('self-update-progress', function (progress) {
+      if (!state.applying) return;
+      var received = progress && progress.received ? progress.received : 0;
+      var total = progress && progress.total ? progress.total : 0;
+      state.percent = total ? Math.min(100, Math.round((received / total) * 100)) : 0;
+      var title = host().querySelector('.title');
+      if (title) title.textContent = '正在下载 (' + state.percent + '%)';
+    });
+  }
+
+  function waitSelfUpdateUi() {
+    attachSelfUpdateUi();
+    if (!window.__bhchat_update_ui__) setTimeout(waitSelfUpdateUi, 400);
+  }
+  waitSelfUpdateUi();
 
   window.__bhchat_webpack_hook__ = true;
   console.log('[BetterHeyboxChat] webpack hook installed');

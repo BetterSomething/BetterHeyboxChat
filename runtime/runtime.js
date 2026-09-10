@@ -288,6 +288,192 @@
     return api[method](arg);
   }
 
+  var UPDATE_STORAGE_KEY = 'bhchat.update';
+  var lastSelfUpdate = null;
+
+  function defaultUpdateChannel() {
+    return window.BHChat && window.BHChat.channel === 'release' ? 'release' : 'dev';
+  }
+
+  function loadUpdateSettings() {
+    return storageApi.get(UPDATE_STORAGE_KEY).then(function (saved) {
+      var mode = saved && (saved.mode === 'quiet' || saved.mode === 'auto') ? saved.mode : 'notify';
+      var channel =
+        saved && saved.channel === 'release'
+          ? 'release'
+          : saved && saved.channel === 'dev'
+            ? 'dev'
+            : defaultUpdateChannel();
+      var ignored =
+        saved && saved.ignored && saved.ignored.version
+          ? { channel: String(saved.ignored.channel || ''), version: String(saved.ignored.version) }
+          : null;
+      return { mode: mode, channel: channel, ignored: ignored };
+    });
+  }
+
+  function saveUpdateSettings(next) {
+    return storageApi.set(UPDATE_STORAGE_KEY, {
+      mode: next.mode || 'notify',
+      channel: next.channel === 'release' ? 'release' : 'dev',
+      ignored: next.ignored || null,
+    });
+  }
+
+  function loadUpdateMirror() {
+    return storageApi.ns('marketplace').get('settings').then(function (saved) {
+      var mirror = saved && typeof saved.mirror === 'string' ? saved.mirror.trim() : '';
+      return mirror || 'https://gh.qmqaq.top/';
+    });
+  }
+
+  function isSessionBusy() {
+    try {
+      var rtc = window.$rtc;
+      if (rtc && rtc.clientData && rtc.clientData.channel_id) return true;
+    } catch (err) {}
+    try {
+      var store = getStore();
+      if (store && store.state && Number(store.state.rtc_connection) === 1) return true;
+    } catch (err) {}
+    try {
+      if (document.querySelector('.bhchat-ss-track')) return true;
+    } catch (err) {}
+    return false;
+  }
+
+  function localUpdateBuild() {
+    return {
+      version: (window.BHChat && window.BHChat.version) || 'dev',
+      channel: (window.BHChat && window.BHChat.channel) || 'dev',
+      commit: (window.BHChat && window.BHChat.commit) || 'unknown',
+    };
+  }
+
+  function updateApi() {
+    return window.bhchatPreload && window.bhchatPreload.update;
+  }
+
+  function decideUpdateAction(result, manual) {
+    if (!result.ok || !result.available || result.ignored) return 'none';
+    if (result.mode === 'auto' && !result.busy && !manual) return 'auto';
+    if (manual && result.available && !result.ignored) return 'dialog';
+    if (!manual && (result.mode === 'notify' || (result.mode === 'auto' && result.busy))) {
+      return 'dialog';
+    }
+    return 'none';
+  }
+
+  function checkSelfUpdate(opts) {
+    opts = opts || {};
+    var manual = !!opts.manual;
+    var api = updateApi();
+    if (!api || typeof api.fetchManifest !== 'function') {
+      var missing = {
+        ok: false,
+        error: '更新模块未就绪',
+        available: false,
+        ignored: false,
+        busy: false,
+        mode: 'notify',
+        local: localUpdateBuild(),
+        remote: null,
+        action: 'none',
+      };
+      lastSelfUpdate = missing;
+      return Promise.resolve(missing);
+    }
+    return Promise.all([loadUpdateSettings(), loadUpdateMirror()]).then(function (pair) {
+      var settings = pair[0];
+      var mirror = pair[1];
+      var local = localUpdateBuild();
+      var track = settings.channel === 'release' ? 'release' : 'dev';
+      var compareLocal = {
+        version: local.version,
+        commit: local.commit,
+        channel: track,
+      };
+      return api.fetchManifest({ channel: track, mirror: mirror }).then(function (fetched) {
+        if (!fetched || !fetched.ok) {
+          var fail = {
+            ok: false,
+            error: (fetched && fetched.error) || '检查更新失败',
+            available: false,
+            ignored: false,
+            busy: isSessionBusy(),
+            mode: settings.mode,
+            channel: track,
+            local: local,
+            remote: null,
+            mirror: mirror,
+            action: 'none',
+          };
+          lastSelfUpdate = fail;
+          if (window.BHChat && window.BHChat.emit) window.BHChat.emit('self-update', fail);
+          return fail;
+        }
+        var remote = fetched.manifest;
+        var result = {
+          ok: true,
+          error: '',
+          available: !!api.hasUpdate(compareLocal, remote),
+          ignored: false,
+          busy: isSessionBusy(),
+          mode: settings.mode,
+          channel: track,
+          local: local,
+          remote: remote,
+          mirror: mirror,
+          action: 'none',
+        };
+        result.ignored = !!(result.available && api.isIgnored(settings.ignored, remote));
+        result.action = decideUpdateAction(result, manual);
+        lastSelfUpdate = result;
+        if (window.BHChat && window.BHChat.emit) window.BHChat.emit('self-update', result);
+        if (result.action === 'auto') {
+          applySelfUpdate(remote).catch(function (err) {
+            result.action = 'dialog';
+            result.error = (err && err.message) || String(err);
+            lastSelfUpdate = result;
+            if (window.BHChat && window.BHChat.emit) window.BHChat.emit('self-update', result);
+          });
+        }
+        return result;
+      });
+    });
+  }
+
+  function applySelfUpdate(remote) {
+    var api = updateApi();
+    if (!api || !remote) {
+      return Promise.reject(new Error('更新模块未就绪'));
+    }
+    return loadUpdateMirror().then(function (mirror) {
+      return api.downloadInstaller({
+        manifest: remote,
+        mirror: mirror,
+        onProgress: function (progress) {
+          if (window.BHChat && window.BHChat.emit) {
+            window.BHChat.emit('self-update-progress', progress);
+          }
+        },
+      }).then(function (exePath) {
+        api.cleanupOldInstallers(remote.artifact);
+        api.launchInstaller(exePath, api.resolveInstallRoot());
+        return { ok: true, launched: true };
+      });
+    });
+  }
+
+  function ignoreSelfUpdate(remote) {
+    return loadUpdateSettings().then(function (settings) {
+      settings.ignored = remote
+        ? { channel: remote.channel, version: remote.version }
+        : null;
+      return saveUpdateSettings(settings);
+    });
+  }
+
   var build =
     typeof BHC_BUILD !== 'undefined' && BHC_BUILD
       ? BHC_BUILD
@@ -380,6 +566,40 @@
     isPluginEnabled: isPluginEnabled,
     setPluginEnabled: setPluginEnabled,
     restart: restart,
+
+    update: {
+      check: function (opts) {
+        return checkSelfUpdate(opts);
+      },
+      apply: function (remote) {
+        return applySelfUpdate(remote);
+      },
+      ignore: function (remote) {
+        return ignoreSelfUpdate(remote);
+      },
+      getSettings: function () {
+        return loadUpdateSettings();
+      },
+      setMode: function (mode) {
+        return loadUpdateSettings().then(function (settings) {
+          settings.mode = mode === 'quiet' || mode === 'auto' ? mode : 'notify';
+          return saveUpdateSettings(settings).then(function () {
+            return settings;
+          });
+        });
+      },
+      setChannel: function (channel) {
+        return loadUpdateSettings().then(function (settings) {
+          settings.channel = channel === 'release' ? 'release' : 'dev';
+          return saveUpdateSettings(settings).then(function () {
+            return settings;
+          });
+        });
+      },
+      lastResult: function () {
+        return lastSelfUpdate;
+      },
+    },
 
     plugins: {
       dataRoot: function () {
@@ -572,6 +792,12 @@
       if (window.__bhchat_bootstrap_patch__) {
         window.__bhchat_bootstrap_patch__();
       }
+      if (window.bhchatPreload && window.bhchatPreload.update) {
+        window.bhchatPreload.update.cleanupOldInstallers('');
+      }
+      setTimeout(function () {
+        checkSelfUpdate({ manual: false }).catch(function () {});
+      }, 1200);
     },
   };
 })();
