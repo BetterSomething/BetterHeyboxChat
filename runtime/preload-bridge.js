@@ -86,6 +86,7 @@
     });
   }
 
+  var lastUpdateProgress = { received: 0, total: 0, threads: 1 };
   var pluginStore = require('./lib/plugin-store.js');
   var patchGuard = require('./lib/patch-guard.js');
   var selfUpdate = require('./lib/self-update.js');
@@ -163,6 +164,9 @@
       installRemote: function (opts) {
         return pluginStore.installRemote(opts || {});
       },
+      installPreview: function (preview) {
+        return pluginStore.installPreview(preview);
+      },
       readUserFile: function (id, rel) {
         var buf = pluginStore.readUserFile(id, rel);
         return buf ? buf.toString('utf8') : null;
@@ -181,7 +185,23 @@
         return selfUpdate.fetchManifest(opts || {});
       },
       downloadInstaller: function (opts) {
-        return selfUpdate.downloadInstaller(opts || {});
+        opts = opts || {};
+        lastUpdateProgress = { received: 0, total: 0, threads: 1 };
+        return selfUpdate.downloadInstaller({
+          manifest: opts.manifest,
+          mirror: opts.mirror,
+          threads: opts.threads,
+          onProgress: function (progress) {
+            lastUpdateProgress = {
+              received: progress && progress.received ? progress.received : 0,
+              total: progress && progress.total ? progress.total : 0,
+              threads: progress && progress.threads ? progress.threads : 1,
+            };
+          },
+        });
+      },
+      lastProgress: function () {
+        return lastUpdateProgress;
       },
       launchInstaller: function (exePath, installRoot) {
         return selfUpdate.launchInstaller(exePath, installRoot);

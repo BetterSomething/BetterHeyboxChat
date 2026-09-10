@@ -4,6 +4,40 @@
   var PLUGIN_ID = 'marketplace';
   var STORAGE_KEY = 'settings';
   var DEFAULT_MIRROR = 'https://gh.qmqaq.top/';
+  var PLUGIN_CONCURRENCY = 4;
+
+  function runPool(items, limit, worker) {
+    var list = items || [];
+    var cap = Math.max(1, limit || 1);
+    var out = new Array(list.length);
+    var cursor = 0;
+    var active = 0;
+    return new Promise(function (resolve, reject) {
+      function next() {
+        if (cursor >= list.length && active === 0) {
+          resolve(out);
+          return;
+        }
+        while (active < cap && cursor < list.length) {
+          (function (index) {
+            active += 1;
+            Promise.resolve(worker(list[index], index)).then(
+              function (value) {
+                out[index] = value;
+                active -= 1;
+                next();
+              },
+              reject,
+            );
+          })(cursor++);
+        }
+      }
+      if (!list.length) resolve(out);
+      else next();
+    });
+  }
+  var pendingOnboardIds = null;
+  var marketplaceVm = null;
 
   function pluginsApi() {
     return (window.BHChat && window.BHChat.plugins) || {};
@@ -101,6 +135,9 @@
   function installPending(pending, opts) {
     var api = pluginsApi();
     opts = opts || {};
+    if (pending.preview && pending.preview.files && api.installPreview) {
+      return api.installPreview(pending.preview);
+    }
     if (pending.remoteId && api.installRemote) {
       return api.installRemote({
         id: pending.remoteId,
@@ -108,6 +145,7 @@
         clientVersion: clientVersion(),
         localDebug: !!opts.localDebug,
         localRoot: opts.localRoot || '',
+        preview: pending.preview,
       });
     }
     if (pending.zipPath && api.installZipPath) return api.installZipPath(pending.zipPath);
@@ -179,6 +217,7 @@
       },
       created: function () {
         var self = this;
+        marketplaceVm = this;
         this.refreshUserPlugins();
         loadSettings().then(function (settings) {
           self.mirror = settings.mirror || DEFAULT_MIRROR;
@@ -196,6 +235,7 @@
       },
       beforeDestroy: function () {
         if (this._onDialogKey) document.removeEventListener('keydown', this._onDialogKey);
+        if (marketplaceVm === this) marketplaceVm = null;
       },
       methods: {
         progressPercent: function () {
@@ -305,6 +345,7 @@
                   : '货架是空的',
               );
               self.error = '';
+              if (pendingOnboardIds) self.applyOnboardSelect(pendingOnboardIds);
             })
             .catch(function (err) {
               self.loadingCatalog = false;
@@ -383,6 +424,20 @@
           if (next[id]) delete next[id];
           else next[id] = true;
           this[mapName] = next;
+        },
+        applyOnboardSelect: function (ids) {
+          var installed = this.installedMap();
+          var catalog = this.catalog || [];
+          var present = {};
+          catalog.forEach(function (item) {
+            if (item && item.id) present[item.id] = true;
+          });
+          var next = {};
+          (ids || []).forEach(function (id) {
+            if (installed[id] || !present[id]) return;
+            next[id] = true;
+          });
+          this.catalogSelected = next;
         },
         onToggleCatalog: function (id) {
           this.toggleSelected('catalogSelected', id);
@@ -500,24 +555,22 @@
           }
           this.error = '';
           this.busy = true;
-          this.setProgress(0, ids.length, '正在读取已选插件… 0/' + ids.length);
+          this.setProgress(0, ids.length, '正在并发读取已选插件… 0/' + ids.length);
           var items = [];
           var errors = [];
-          var chain = Promise.resolve();
-          ids.forEach(function (id, index) {
-            chain = chain.then(function () {
+          var done = 0;
+          runPool(ids, PLUGIN_CONCURRENCY, function (id) {
+            return self.inspectRemoteItem(id).then(function (result) {
+              done += 1;
               self.setProgress(
-                index + 1,
+                done,
                 ids.length,
-                '正在读取已选插件… ' + (index + 1) + '/' + ids.length + '：' + id,
+                '正在并发读取已选插件… ' + done + '/' + ids.length + '：' + id,
               );
-              return self.inspectRemoteItem(id).then(function (result) {
-                if (result.ok) items.push(result);
-                else errors.push(id + '：' + (result.error || '失败'));
-              });
+              if (result.ok) items.push(result);
+              else errors.push(id + '：' + (result.error || '失败'));
             });
-          });
-          chain
+          })
             .then(function () {
               self.busy = false;
               self.clearProgress('');
@@ -545,35 +598,33 @@
           var items = dialog.items || [];
           this.busy = true;
           this.error = '';
-          this.setProgress(0, items.length, '正在安装 0/' + items.length);
+          this.setProgress(0, items.length, '正在并发安装 0/' + items.length);
           var okIds = [];
           var errors = [];
-          var chain = Promise.resolve();
-          items.forEach(function (item, index) {
-            chain = chain.then(function () {
-              var man = item.preview && item.preview.manifest;
-              var label = sanitize((man && man.name) || (man && man.id) || '插件', 40);
+          var done = 0;
+          runPool(items, PLUGIN_CONCURRENCY, function (item) {
+            var man = item.preview && item.preview.manifest;
+            var label = sanitize((man && man.name) || (man && man.id) || '插件', 40);
+            return Promise.resolve(
+              installPending(item.pending, {
+                mirror: self.mirror,
+                localDebug: self.localDebug,
+                localRoot: self.catalogLocalRoot(),
+              }),
+            ).then(function (result) {
+              done += 1;
               self.setProgress(
-                index + 1,
+                done,
                 items.length,
-                '正在安装 ' + (index + 1) + '/' + items.length + '：' + label,
+                '正在并发安装 ' + done + '/' + items.length + '：' + label,
               );
-              return Promise.resolve(
-                installPending(item.pending, {
-                  mirror: self.mirror,
-                  localDebug: self.localDebug,
-                  localRoot: self.catalogLocalRoot(),
-                }),
-              ).then(function (result) {
-                if (!result || !result.ok) {
-                  errors.push((item.preview && item.preview.manifest && item.preview.manifest.id) || '插件');
-                  return;
-                }
-                okIds.push(result.id);
-              });
+              if (!result || !result.ok) {
+                errors.push((item.preview && item.preview.manifest && item.preview.manifest.id) || '插件');
+                return;
+              }
+              okIds.push(result.id);
             });
-          });
-          chain.then(function () {
+          }).then(function () {
             self.busy = false;
             self.refreshUserPlugins();
             if (!okIds.length) {
@@ -587,6 +638,10 @@
             );
             self.error = errors.length ? '部分插件安装失败：' + errors.join('、') : '';
             self.dialog = { mode: 'restart', afterInstall: true, names: okIds };
+          }).catch(function (err) {
+            self.busy = false;
+            self.clearProgress('');
+            self.error = (err && err.message) || '安装失败';
           });
         },
         onConfirmUninstall: function () {
@@ -1195,6 +1250,14 @@
   function activate() {
     injectMarketplaceStyle();
     if (!window.BHChat || !window.BHChat.registerPanel) return;
+    if (window.BHChat.on) {
+      window.BHChat.on('onboard-select-catalog', function (ids) {
+        pendingOnboardIds = ids || null;
+        if (marketplaceVm && marketplaceVm.applyOnboardSelect) {
+          marketplaceVm.applyOnboardSelect(pendingOnboardIds);
+        }
+      });
+    }
     window.BHChat.registerPanel({
       id: PLUGIN_ID,
       title: '插件市场',

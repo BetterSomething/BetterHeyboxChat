@@ -17,6 +17,7 @@ import {
 
 const require = createRequire(import.meta.url);
 const selfUpdate = require('../runtime/lib/self-update.js');
+const pluginRegistry = require('../runtime/lib/plugin-registry.js');
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const patchJs = path.join(root, 'packages/loader/dist/patch.js');
@@ -109,6 +110,24 @@ function testSelfUpdateCompare() {
       === 'D:/x',
     '安装根应从 app 上推到黑盒安装根',
   );
+  const parts = selfUpdate.splitRanges(8 * 1024 * 1024, 4);
+  assert(parts.length === 4, '8MB 应拆成 4 段');
+  assert(parts[0].start === 0 && parts[3].end === 8 * 1024 * 1024 - 1, '分段应覆盖全文件');
+  assert(
+    parts.every((part, i) => i === 0 || part.start === parts[i - 1].end + 1),
+    '分段应首尾相接',
+  );
+  assert(selfUpdate.splitRanges(100, 4).length === 1, '过小文件不应拆段');
+}
+
+async function testMapLimit() {
+  const seen = [];
+  const result = await pluginRegistry.mapLimit([1, 2, 3, 4, 5], 2, function (n) {
+    seen.push(n);
+    return Promise.resolve(n * 10);
+  });
+  assert(result.join(',') === '10,20,30,40,50', 'mapLimit 应保序');
+  assert(seen.length === 5, 'mapLimit 应跑完全部');
 }
 
 function testCliHelp() {
@@ -172,6 +191,7 @@ async function testReinstall() {
 const steps = [
   ['versioning', testVersioning],
   ['self-update-compare', testSelfUpdateCompare],
+  ['map-limit', testMapLimit],
   ['cli-help', testCliHelp],
   ['reinstall', testReinstall],
 ];

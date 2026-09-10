@@ -165,6 +165,7 @@ await store.del('volume');
 
 ```javascript
 BHChat.openSettings('betterheyboxchat');
+BHChat.openPanel('marketplace'); // 打开设置并跳转插件市场
 ```
 
 

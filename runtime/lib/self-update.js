@@ -17,6 +17,9 @@ var API_DEV =
 var MAX_JSON_BYTES = 512 * 1024;
 var MAX_INSTALLER_BYTES = 40 * 1024 * 1024;
 var USER_AGENT = 'BetterHeyboxChat-self-update';
+var DEFAULT_THREADS = 4;
+var MAX_THREADS = 8;
+var MIN_PART_BYTES = 256 * 1024;
 
 function normalizeMirrorPrefix(mirror) {
   var raw = String(mirror || '').trim();
@@ -183,11 +186,28 @@ function tempDir() {
   return require('path').join(require('os').tmpdir(), 'BetterHeyboxChat');
 }
 
-function requestBuffer(url, opts) {
+function splitRanges(total, threads) {
+  var size = Math.max(0, parseInt(total, 10) || 0);
+  var count = Math.max(1, Math.min(MAX_THREADS, parseInt(threads, 10) || DEFAULT_THREADS));
+  if (size <= 0) return [];
+  while (count > 1 && Math.ceil(size / count) < MIN_PART_BYTES) count -= 1;
+  var part = Math.ceil(size / count);
+  var ranges = [];
+  var start = 0;
+  for (var i = 0; i < count && start < size; i++) {
+    var end = Math.min(size - 1, start + part - 1);
+    ranges.push({ start: start, end: end });
+    start = end + 1;
+  }
+  return ranges;
+}
+
+function requestResponse(url, opts) {
   opts = opts || {};
   var maxBytes = opts.maxBytes || MAX_JSON_BYTES;
   var timeout = opts.timeout || 20000;
   var redirects = opts.redirects || 0;
+  var extraHeaders = opts.headers || {};
   return new Promise(function (resolve, reject) {
     var href = String(url || '');
     if (!/^https?:\/\//i.test(href)) {
@@ -195,50 +215,164 @@ function requestBuffer(url, opts) {
       return;
     }
     var lib = href.indexOf('https:') === 0 ? require('https') : require('http');
-    var req = lib.get(
-      href,
-      {
-        timeout: timeout,
-        headers: { 'User-Agent': USER_AGENT, Accept: opts.accept || '*/*' },
-      },
-      function (res) {
-        var loc = res.headers && res.headers.location;
-        if (res.statusCode >= 300 && res.statusCode < 400 && loc && redirects < 5) {
-          res.resume();
-          resolve(requestBuffer(loc, Object.assign({}, opts, { redirects: redirects + 1 })));
-          return;
-        }
-        if (res.statusCode !== 200) {
+    var headers = { 'User-Agent': USER_AGENT, Accept: opts.accept || '*/*' };
+    Object.keys(extraHeaders).forEach(function (key) {
+      if (extraHeaders[key] != null) headers[key] = extraHeaders[key];
+    });
+    var reqOpts = { timeout: timeout, headers: headers };
+    if (opts.agent) reqOpts.agent = opts.agent;
+    var req = lib.get(href, reqOpts, function (res) {
+      var loc = res.headers && res.headers.location;
+      if (res.statusCode >= 300 && res.statusCode < 400 && loc && redirects < 5) {
+        res.resume();
+        resolve(requestResponse(loc, Object.assign({}, opts, { redirects: redirects + 1 })));
+        return;
+      }
+      if (opts.allowStatuses) {
+        var allowed = opts.allowStatuses.indexOf(res.statusCode) >= 0;
+        if (!allowed) {
           res.resume();
           reject(new Error('下载失败 HTTP ' + res.statusCode));
           return;
         }
-        var chunks = [];
-        var total = 0;
-        res.on('data', function (chunk) {
-          total += chunk.length;
-          if (total > maxBytes) {
-            req.destroy();
-            reject(new Error('文件过大'));
-            return;
-          }
-          if (typeof opts.onProgress === 'function') {
-            var size = parseInt(res.headers['content-length'], 10) || 0;
-            opts.onProgress({ received: total, total: size });
-          }
-          chunks.push(chunk);
+      } else if (res.statusCode !== 200) {
+        res.resume();
+        reject(new Error('下载失败 HTTP ' + res.statusCode));
+        return;
+      }
+      var chunks = [];
+      var received = 0;
+      var announced = parseInt(res.headers['content-length'], 10) || 0;
+      res.on('data', function (chunk) {
+        received += chunk.length;
+        if (received > maxBytes) {
+          req.destroy();
+          reject(new Error('文件过大'));
+          return;
+        }
+        if (typeof opts.onProgress === 'function') {
+          opts.onProgress({ received: received, total: announced });
+        }
+        chunks.push(chunk);
+      });
+      res.on('end', function () {
+        resolve({
+          statusCode: res.statusCode,
+          headers: res.headers || {},
+          buffer: Buffer.concat(chunks),
         });
-        res.on('end', function () {
-          resolve(Buffer.concat(chunks));
-        });
-      },
-    );
+      });
+    });
+    if (opts.onRequest) opts.onRequest(req);
     req.on('error', reject);
     req.on('timeout', function () {
       req.destroy();
       reject(new Error('下载超时'));
     });
   });
+}
+
+function requestBuffer(url, opts) {
+  return requestResponse(url, opts).then(function (res) {
+    return res.buffer;
+  });
+}
+
+function parseContentRangeTotal(header) {
+  var match = /\/(\d+)\s*$/.exec(String(header || ''));
+  return match ? parseInt(match[1], 10) : 0;
+}
+
+function probeRangeSupport(url, opts) {
+  return requestResponse(url, {
+    headers: { Range: 'bytes=0-0' },
+    accept: opts.accept,
+    timeout: opts.timeout || 20000,
+    maxBytes: 16,
+    allowStatuses: [200, 206],
+    agent: opts.agent,
+  }).then(function (res) {
+    var total = parseContentRangeTotal(res.headers['content-range']);
+    if (!total && res.statusCode === 200) {
+      total = parseInt(res.headers['content-length'], 10) || 0;
+    }
+    return {
+      ranged: res.statusCode === 206 && total > 0,
+      total: total,
+    };
+  });
+}
+
+function downloadSingle(url, opts) {
+  var received = 0;
+  return requestBuffer(url, {
+    maxBytes: opts.maxBytes,
+    timeout: opts.timeout,
+    accept: opts.accept,
+    agent: opts.agent,
+    onProgress: function (progress) {
+      received = progress.received || 0;
+      if (typeof opts.onProgress === 'function') {
+        opts.onProgress({
+          received: received,
+          total: progress.total || 0,
+          threads: 1,
+        });
+      }
+    },
+  });
+}
+
+function downloadRanged(url, total, threads, opts) {
+  var ranges = splitRanges(total, threads);
+  if (ranges.length <= 1) return downloadSingle(url, opts);
+  var received = ranges.map(function () {
+    return 0;
+  });
+  var reqs = [];
+  function report() {
+    var sum = 0;
+    for (var i = 0; i < received.length; i++) sum += received[i];
+    if (typeof opts.onProgress === 'function') {
+      opts.onProgress({ received: sum, total: total, threads: ranges.length });
+    }
+  }
+  return Promise.all(
+    ranges.map(function (range, index) {
+      var expected = range.end - range.start + 1;
+      return requestResponse(url, {
+        headers: { Range: 'bytes=' + range.start + '-' + range.end },
+        accept: opts.accept,
+        timeout: opts.timeout,
+        maxBytes: expected + 64,
+        allowStatuses: [206],
+        agent: opts.agent,
+        onRequest: function (req) {
+          reqs.push(req);
+        },
+        onProgress: function (progress) {
+          received[index] = progress.received || 0;
+          report();
+        },
+      }).then(function (res) {
+        if (!res.buffer || res.buffer.length !== expected) {
+          throw new Error('分段长度不符');
+        }
+        return res.buffer;
+      });
+    }),
+  )
+    .then(function (parts) {
+      return Buffer.concat(parts);
+    })
+    .catch(function (err) {
+      reqs.forEach(function (req) {
+        try {
+          req.destroy();
+        } catch (destroyErr) {}
+      });
+      throw err;
+    });
 }
 
 function fetchManifest(opts) {
@@ -274,6 +408,11 @@ function sha256Buffer(buf) {
   return require('crypto').createHash('sha256').update(buf).digest('hex');
 }
 
+function createDownloadAgent(threads) {
+  var https = require('https');
+  return new https.Agent({ keepAlive: true, maxSockets: Math.max(1, threads) });
+}
+
 function downloadInstaller(opts) {
   opts = opts || {};
   var manifest = opts.manifest;
@@ -284,11 +423,15 @@ function downloadInstaller(opts) {
   var path = require('path');
   var dir = tempDir();
   var dest = path.join(dir, manifest.artifact);
-  return requestBuffer(url, {
+  var threads = Math.max(1, Math.min(MAX_THREADS, parseInt(opts.threads, 10) || DEFAULT_THREADS));
+  var agent = createDownloadAgent(threads);
+  var common = {
     maxBytes: MAX_INSTALLER_BYTES,
     timeout: 120000,
     onProgress: opts.onProgress,
-  }).then(function (buf) {
+    agent: agent,
+  };
+  function writeBuf(buf) {
     var actual = sha256Buffer(buf);
     if (manifest.sha256 && actual !== manifest.sha256) {
       throw new Error('安装包校验失败');
@@ -296,7 +439,21 @@ function downloadInstaller(opts) {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(dest, buf);
     return dest;
-  });
+  }
+  return probeRangeSupport(url, common)
+    .then(function (probe) {
+      if (probe.ranged && probe.total > 0 && probe.total <= MAX_INSTALLER_BYTES) {
+        return downloadRanged(url, probe.total, threads, common);
+      }
+      return downloadSingle(url, common);
+    })
+    .catch(function () {
+      return downloadSingle(url, common);
+    })
+    .then(writeBuf)
+    .finally(function () {
+      if (agent && typeof agent.destroy === 'function') agent.destroy();
+    });
 }
 
 function cleanupOldInstallers(keepName) {
@@ -340,6 +497,7 @@ module.exports = {
   manifestFromGithubApi: manifestFromGithubApi,
   resolveInstallRoot: resolveInstallRoot,
   fetchManifest: fetchManifest,
+  splitRanges: splitRanges,
   downloadInstaller: downloadInstaller,
   cleanupOldInstallers: cleanupOldInstallers,
   launchInstaller: launchInstaller,

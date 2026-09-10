@@ -462,6 +462,9 @@
     capture: persistLive,
     restore: tryRestore,
     markRestart: markRestart,
+    isRestoring: function () {
+      return !!restoring;
+    },
   };
 
   window.BHChat.on('ready', function () {
@@ -469,6 +472,7 @@
     tryRestore().then(function () {
       restoring = false;
       startWatch();
+      window.BHChat.emit('session-ready');
     });
   });
 })(typeof window !== 'undefined' ? window : this);

@@ -17,6 +17,7 @@ var GITHUB_WEB_BASE =
 var MAX_FILES = 256;
 var MAX_TOTAL_BYTES = 40 * 1024 * 1024;
 var MAX_FILE_BYTES = 20 * 1024 * 1024;
+var FILE_CONCURRENCY = 4;
 
 function joinUrl(base, rel) {
   return String(base || '').replace(/\/+$/, '/') + String(rel || '').replace(/^\/+/, '');
@@ -98,6 +99,42 @@ function parseRegistry(raw) {
     });
   }
   return { ok: true, version: 1, plugins: plugins };
+}
+
+function mapLimit(items, limit, worker) {
+  var list = Array.isArray(items) ? items : [];
+  var cap = Math.max(1, parseInt(limit, 10) || 1);
+  var out = new Array(list.length);
+  var cursor = 0;
+  var active = 0;
+  var failed = false;
+  return new Promise(function (resolve, reject) {
+    function next() {
+      if (failed) return;
+      if (cursor >= list.length && active === 0) {
+        resolve(out);
+        return;
+      }
+      while (!failed && active < cap && cursor < list.length) {
+        (function (index) {
+          active += 1;
+          Promise.resolve(worker(list[index], index)).then(
+            function (value) {
+              out[index] = value;
+              active -= 1;
+              next();
+            },
+            function (err) {
+              failed = true;
+              reject(err);
+            },
+          );
+        })(cursor++);
+      }
+    }
+    if (!list.length) resolve(out);
+    else next();
+  });
 }
 
 function defaultFetch(url, redirects) {
@@ -294,26 +331,24 @@ function inspectRemote(opts) {
       if (rels.length > MAX_FILES) {
         return { ok: false, error: '插件文件过多' };
       }
-      var map = {};
-      var total = 0;
-      var chain = Promise.resolve();
-      rels.forEach(function (rel) {
-        chain = chain.then(function () {
-          if (rel === 'manifest.json') {
-            map[rel] = manifestBuf;
-            total += manifestBuf.length;
-            return;
-          }
-          return fetchBuffer(opts, id + '/' + rel).then(function (buf) {
-            total += buf.length;
-            if (total > MAX_TOTAL_BYTES) {
-              throw new Error('插件过大');
-            }
-            map[rel] = buf;
-          });
-        });
+      var pending = rels.filter(function (rel) {
+        return rel !== 'manifest.json';
       });
-      return chain.then(function () {
+      return mapLimit(pending, FILE_CONCURRENCY, function (rel) {
+        return fetchBuffer(opts, id + '/' + rel).then(function (buf) {
+          return { rel: rel, buf: buf };
+        });
+      }).then(function (files) {
+        var map = { 'manifest.json': manifestBuf };
+        var total = manifestBuf.length;
+        for (var i = 0; i < files.length; i++) {
+          if (!files[i] || !files[i].buf) continue;
+          total += files[i].buf.length;
+          if (total > MAX_TOTAL_BYTES) {
+            return { ok: false, error: '插件过大' };
+          }
+          map[files[i].rel] = files[i].buf;
+        }
         var inspected = pkg.inspectFileMap(map);
         if (!inspected.ok) return inspected;
         if (inspected.manifest.id !== id) {
@@ -335,6 +370,7 @@ module.exports = {
   joinUrl: joinUrl,
   parseRegistry: parseRegistry,
   collectRemoteRelPaths: collectRemoteRelPaths,
+  mapLimit: mapLimit,
   resolveLocalRoot: resolveLocalRoot,
   fetchRegistry: fetchRegistry,
   inspectRemote: inspectRemote,

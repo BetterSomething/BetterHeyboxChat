@@ -25,7 +25,7 @@
 | 方法 | 说明 |
 | --- | --- |
 | `check({ manual }?)` | 拉清单并比较。启动自动检查失败不弹。`action` 为 `dialog` / `auto` / `none` |
-| `apply(remote)` | 下载安装包、校验 sha256、拉起 `bhchat-installer.exe --reinstall --yes` |
+| `apply(remote)` | 分段多线程下载安装包（支持 Range 时默认 4 路）、校验 sha256、拉起 `bhchat-installer.exe --reinstall --yes`。进度走 `self-update-progress` |
 | `ignore(remote)` | 记下通道+版本，同版本不再弹、不自动装 |
 | `getSettings()` / `setMode(mode)` / `setChannel(channel)` | `mode` 为 `notify`（默认）/ `quiet` / `auto`；`channel` 为 `dev` / `release` |
 | `lastResult()` | 最近一次检查结果 |
@@ -108,9 +108,13 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 | 事件 | 载荷 | 何时 |
 | --- | --- | --- |
 | `ready` | 无 | 全部启用插件加载完 |
+| `session-ready` | 无 | 会话恢复结束（没有要恢复的也会发） |
 | `client-update` | patch 状态对象 | 启动检查或手动 `patch.ensure` 之后 |
 | `panel-registered` | `panelId` | `registerPanel` 成功 |
 | `plugin-enabled-changed` | `{ id, enabled }` | `setPluginEnabled` 写入后（脚本仍按旧状态运行） |
+| `open-panel` | `panelId` | `openPanel` 或引导钻取插件设置 |
+| `onboard-select-catalog` | `string[]` | 引导要求市场勾选推荐插件 |
+| `onboard-active` / `onboard-inactive` | 无 | 新手引导开始 / 结束 |
 
 ## UI
 
@@ -143,6 +147,22 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 ### `openSettings(blockKey?)`
 
 打开官方设置弹窗并切到指定侧栏。默认 `'betterheyboxchat'`。成功返回 `true`。
+
+### `openPanel(panelId)`
+
+先 `openSettings('betterheyboxchat')`，再切到已注册的插件设置页（`panelId` 等于插件 id）。设置组件未挂载时会记下，挂上后再钻取。
+
+### `BHChat.onboard`
+
+首次用户教练卡。自动弹出条件：没有 `done`/`skipped` 记录，且还没有用户插件。重装/更新若已有用户插件或已完成记录则不弹。设置页「重看引导」可再走一遍。
+
+| 方法 | 说明 |
+| --- | --- |
+| `isActive()` | 教练卡是否正在显示 |
+| `replay()` | 立刻再走一遍（不改完成记录，直到再次跳过或走完） |
+| `skip()` / `finish()` | 关掉；非重看时写入 `skipped` / `done` |
+
+框架占用存储键 `bhchat.onboard`：`{ version: 1, status: 'done' \| 'skipped' }`。
 
 ## 插件管理
 
@@ -205,8 +225,9 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 | `uninstall(id)` | 仅允许用户插件 |
 | `fetchRegistry(mirrorOrOpts?)` | 拉货架 `registry.json`（Promise）。可传字符串加速源，或 `{ mirror, localDebug, localRoot }` |
 | `resolveLocalRoot(path)` | 把绝对路径上溯到含 `registry.json` 的仓根；相对路径拒绝 |
-| `inspectRemote({ id, mirror, clientVersion, localRoot })` | 按需取插件目录，不写盘 |
-| `installRemote({ id, mirror, clientVersion, localRoot })` | 确认后写入用户插件目录 |
+| `inspectRemote({ id, mirror, clientVersion, localRoot })` | 按需并发拉取插件文件，不写盘 |
+| `installRemote({ id, mirror, clientVersion, localRoot })` | 确认后写入用户插件目录。若已有 inspect 结果可走 `installPreview`，避免再下一次 |
+| `installPreview(preview)` | 把已下载的 inspect 结果写入用户插件目录 |
 
 默认货架：`https://raw.githubusercontent.com/BetterSomething/BetterHeyboxChat-plugins/main/`。`mirror` 为可替换的 https 前缀。`localDebug` 为真或 `localRoot` 非空时改为读本地目录，失败不回落 GitHub。不在页面里执行远程脚本。
 
@@ -223,7 +244,7 @@ inspect 结果供设置页确认框使用。`desc`/`name`/`author` 已去除 HTM
 | `storage.del(key)` | `Promise<void>` |
 | `storage.ns(pluginId)` | `{ get, set, del }`，key 自动加 `bhchat.plugin.{id}.` |
 
-框架占用的 key：`bhchat.plugins.enabled`、`bhchat.devtools.enabled`、`bhchat.custom_room_bg`。插件请用 `storage.ns(自己的 id)`。
+框架占用的 key：`bhchat.plugins.enabled`、`bhchat.devtools.enabled`、`bhchat.custom_room_bg`、`bhchat.onboard`。插件请用 `storage.ns(自己的 id)`。
 
 ## 子 frame（guest）
 

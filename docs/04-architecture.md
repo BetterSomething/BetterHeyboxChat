@@ -61,6 +61,7 @@ flowchart TB
 | `loader.js` | 读 `bhchat.plugins.enabled`，跳过禁用插件，再 `_ready()` |
 | `lib/storage.js` | `electronAPI` 优先，回退 `localStorage` |
 | `lib/session-restore.js` | 持续快照；installer / `BHChat.restart()` 打标记后，启动时走官方 `$jump` 恢复页面和语音 |
+| `lib/onboard.js` | 新手教程 |
 | `lib/perf-policy.js` | 读 `{dataRoot}/perf-tune.json`；启动前加不关功能的 Chromium 开关；`EmptyWorkingSet` |
 | `main-bridge.js` | F12 / Ctrl+Shift+I；禁止 Proxy 替换 `BrowserWindow` |
 | `preload-bridge.js` | DevTools 开关；**禁止**改 `ELECTRON_ENV` |
@@ -100,7 +101,7 @@ window.BHChat = {
   registerPanel, listPanels,
   registerPlugin, getPlugin, listPlugins, isPluginEnabled, setPluginEnabled,
   restart, storage, storage.ns(pluginId),
-  electron, overlay, steam, laughter, devtools, openSettings,
+  electron, overlay, steam, laughter, devtools, openSettings, openPanel, onboard,
   guest, cookies,
 }
 ```

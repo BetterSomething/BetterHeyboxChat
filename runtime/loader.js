@@ -9,6 +9,7 @@
   var RUNTIME_SCRIPT = '../betterheyboxchat/runtime.js';
   var STORAGE_SCRIPT = '../betterheyboxchat/lib/storage.js';
   var SESSION_SCRIPT = '../betterheyboxchat/lib/session-restore.js';
+  var ONBOARD_SCRIPT = '../betterheyboxchat/lib/onboard.js';
   var INDICATOR_SCRIPT = '../betterheyboxchat/indicator.js';
   var PLUGINS_MANIFEST = '../betterheyboxchat/plugins.json';
 
@@ -129,6 +130,11 @@
           .catch(function (err) {
             console.warn('[BetterHeyboxChat] plugin load skipped:', err);
           });
+      })
+      .then(function () {
+        return loadScript(ONBOARD_SCRIPT).catch(function (err) {
+          console.warn('[BetterHeyboxChat] onboard skipped:', err);
+        });
       })
       .then(function () {
         window.BHChat._ready();

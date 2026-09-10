@@ -216,10 +216,17 @@ function inspectRemote(opts) {
 }
 
 function installRemote(opts) {
+  if (opts && opts.preview && opts.preview.files) {
+    return Promise.resolve(writeInspected(opts.preview));
+  }
   return inspectRemote(opts).then(function (preview) {
     if (!preview.ok) return preview;
     return writeInspected(preview);
   });
+}
+
+function installPreview(preview) {
+  return writeInspected(preview || { ok: false, error: '安装数据不完整' });
 }
 
 function readUserFile(id, rel) {
@@ -246,4 +253,5 @@ module.exports = {
   resolveLocalRoot: registry.resolveLocalRoot,
   inspectRemote: inspectRemote,
   installRemote: installRemote,
+  installPreview: installPreview,
 };

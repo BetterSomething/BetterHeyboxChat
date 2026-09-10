@@ -19,6 +19,7 @@
   };
 
   window.__bhchat_module_map__ = MODULE_MAP;
+  var pendingPanelId = '';
 
   function hSwitch(h, on) {
     return h('span', { class: { 'bhchat-switch': true, on: !!on } }, [
@@ -107,6 +108,12 @@
     return null;
   }
 
+  function downloadPercent(progress) {
+    var received = progress && progress.received ? progress.received : 0;
+    var total = progress && progress.total ? progress.total : 0;
+    return total ? Math.min(100, Math.round((received / total) * 100)) : 0;
+  }
+
   function safeHttpUrl(value) {
     if (!value || typeof value !== 'string') return '';
     try {
@@ -138,6 +145,8 @@
           updateAvailable: false,
           updateIgnored: false,
           updateChecking: false,
+          updateDownloading: false,
+          updatePercent: 0,
         };
       },
       computed: {
@@ -160,7 +169,16 @@
           window.BHChat.on('panel-registered', this.refreshPanels);
           window.BHChat.on('plugin-enabled-changed', this.refreshPlugins);
           window.BHChat.on('self-update', this.onSelfUpdateResult);
+          this._onUpdateProgress = function (progress) {
+            self.onSelfUpdateProgress(progress);
+          };
+          window.BHChat.on('self-update-progress', this._onUpdateProgress);
+          this._onOpenPanel = function (id) {
+            self.onOpenPanelEvent(id);
+          };
+          window.BHChat.on('open-panel', this._onOpenPanel);
         }
+        if (pendingPanelId) this.onOpenPanelEvent(pendingPanelId);
         this._onRestartKey = function (e) {
           if (e && e.key === 'Escape' && self.restartDialog) self.onCancelRestart();
         };
@@ -177,6 +195,8 @@
           window.BHChat.off('panel-registered', this.refreshPanels);
           window.BHChat.off('plugin-enabled-changed', this.refreshPlugins);
           window.BHChat.off('self-update', this.onSelfUpdateResult);
+          if (this._onUpdateProgress) window.BHChat.off('self-update-progress', this._onUpdateProgress);
+          if (this._onOpenPanel) window.BHChat.off('open-panel', this._onOpenPanel);
         }
         if (this._onRestartKey) document.removeEventListener('keydown', this._onRestartKey);
       },
@@ -214,6 +234,20 @@
         onOpenPluginSettings: function (plugin) {
           if (!plugin || !findPanel(this.panels, plugin.id)) return;
           this.activePanelId = plugin.id;
+        },
+        onOpenPanelEvent: function (id) {
+          pendingPanelId = id || '';
+          this.refreshPanels();
+          if (pendingPanelId && findPanel(this.panels, pendingPanelId)) {
+            this.activePanelId = pendingPanelId;
+          } else {
+            this.activePanelId = '';
+          }
+        },
+        onReplayOnboard: function () {
+          if (window.BHChat && window.BHChat.onboard && window.BHChat.onboard.replay) {
+            window.BHChat.onboard.replay();
+          }
         },
         onBackFromSettings: function () {
           this.activePanelId = '';
@@ -267,6 +301,9 @@
           });
           var last = api.lastResult && api.lastResult();
           if (last) this.onSelfUpdateResult(last);
+        },
+        onSelfUpdateProgress: function (progress) {
+          this.updatePercent = downloadPercent(progress);
         },
         onSelfUpdateResult: function (result) {
           if (!result) return;
@@ -324,10 +361,18 @@
           var api = window.BHChat && window.BHChat.update;
           if (!api || !this.updateRemote) return;
           var self = this;
+          this.updateDownloading = true;
+          this.updatePercent = 0;
           this.updateStatus = '正在下载…';
-          Promise.resolve(api.apply(this.updateRemote)).catch(function (err) {
-            self.updateStatus = (err && err.message) || '下载失败';
-          });
+          Promise.resolve(api.apply(this.updateRemote))
+            .then(function () {
+              self.updateDownloading = false;
+              self.updateStatus = '已开始安装';
+            })
+            .catch(function (err) {
+              self.updateDownloading = false;
+              self.updateStatus = (err && err.message) || '下载失败';
+            });
         },
         onToggleIndicator: function () {
           var api = window.BHChat && window.BHChat.indicator;
@@ -558,11 +603,23 @@
                 h('span', { class: 'bhchat-row-value' }, this.updateStatus || '未检查'),
               ]),
             ]),
+            this.updateDownloading
+              ? h('div', { class: 'bhchat-update-progress' }, [
+                  h('div', { class: 'bhchat-update-progress-bar-track' }, [
+                    h('div', {
+                      class: 'bhchat-update-progress-bar',
+                      style: { width: this.updatePercent + '%' },
+                    }),
+                  ]),
+                  h('div', { class: 'bhchat-update-progress-pct' }, this.updatePercent + '%'),
+                ])
+              : null,
             h('div', { class: 'bhchat-actions' }, [
               hBtn(h, this.updateChecking ? '检查中…' : '立即检查', 'secondary', this.onCheckUpdate, this.updateChecking),
               this.updateAvailable
-                ? hBtn(h, '下载并安装', 'primary', this.onApplyUpdate)
+                ? hBtn(h, '下载并安装', 'primary', this.onApplyUpdate, this.updateDownloading)
                 : null,
+              hBtn(h, '重看引导', 'secondary', this.onReplayOnboard),
             ]),
           ]),
           h('div', { class: 'cell' }, pluginChildren),
@@ -668,6 +725,16 @@
       'html[theme=light] .bhchat-update-dialog .content,body[theme=light] .bhchat-update-dialog .content{color:var(--text-2,#32373c)}',
       '.bhchat-update-dialog .btn-wrapper{width:100%;min-height:42px;margin-top:20px;display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:0 24px;flex-shrink:0;flex-wrap:wrap}',
       '.bhchat-update-dialog .btn-wrapper .bhchat-btn{min-width:96px}',
+      '.bhchat-update-progress,.betterheyboxchat-setting-block .bhchat-update-progress{margin:10px 0 0;padding:0 0 2px}',
+      '.bhchat-update-dialog .bhchat-update-progress{padding:0 24px}',
+      '.bhchat-update-progress-bar-track{height:6px;border-radius:3px;overflow:hidden;background:var(--opacity-2,rgba(255,255,255,.14))}',
+      'html[theme=light] .bhchat-update-progress-bar-track,body[theme=light] .bhchat-update-progress-bar-track{background:var(--opacity-2,#00000014)}',
+      '.bhchat-update-progress-bar{height:6px;border-radius:3px;background:var(--brand-text,#7dd95e);transition:width .15s ease}',
+      '.bhchat-update-progress-bar-track .bhchat-update-progress-bar{height:100%}',
+      '.bhchat-update-progress{display:flex;align-items:center;gap:10px}',
+      '.bhchat-update-progress-bar-track{flex:1;min-width:0}',
+      '.bhchat-update-progress-pct{flex-shrink:0;font-size:12px;line-height:16px;color:var(--text-2,#d2d3d7);min-width:36px;text-align:right}',
+      'html[theme=light] .bhchat-update-progress-pct,body[theme=light] .bhchat-update-progress-pct{color:var(--text-2,#32373c)}',
     ].join('');
     document.head.appendChild(style);
   }
@@ -915,7 +982,11 @@
     window.__bhchat_update_ui__ = true;
     injectUpdateDialogStyles();
 
-    var state = { result: null, applying: false, percent: 0, error: '' };
+    var state = { result: null, applying: false, percent: 0, error: '', queued: null };
+
+    function onboardBlocksUpdate() {
+      return !!(window.BHChat && window.BHChat.onboard && window.BHChat.onboard.isActive());
+    }
 
     function host() {
       var el = document.getElementById('bhchat-update-host');
@@ -948,9 +1019,7 @@
       }
       injectUpdateDialogStyles();
       var remote = result.remote;
-      var title = state.applying
-        ? '正在下载 (' + state.percent + '%)'
-        : '发现新版本 (' + remote.version + ')';
+      var title = state.applying ? '正在下载' : '发现新版本 (' + remote.version + ')';
       var notes = state.error || remote.notes || 'BetterHeyboxChat 有可用更新';
       var root = host();
       root.innerHTML = '';
@@ -972,6 +1041,22 @@
       content.className = 'content';
       content.textContent = notes;
       slot.appendChild(content);
+      var progress = null;
+      if (state.applying) {
+        progress = document.createElement('div');
+        progress.className = 'bhchat-update-progress';
+        var track = document.createElement('div');
+        track.className = 'bhchat-update-progress-bar-track';
+        var bar = document.createElement('div');
+        bar.className = 'bhchat-update-progress-bar';
+        bar.style.width = state.percent + '%';
+        track.appendChild(bar);
+        progress.appendChild(track);
+        var pct = document.createElement('div');
+        pct.className = 'bhchat-update-progress-pct';
+        pct.textContent = state.percent + '%';
+        progress.appendChild(pct);
+      }
       var btns = document.createElement('div');
       btns.className = 'btn-wrapper';
 
@@ -1004,6 +1089,7 @@
         makeBtn('下载并安装', 'primary', function () {
           if (state.applying || !window.BHChat.update) return;
           state.applying = true;
+          state.percent = 0;
           state.error = '';
           renderDialog();
           Promise.resolve(window.BHChat.update.apply(remote)).catch(function (err) {
@@ -1016,6 +1102,7 @@
 
       dialog.appendChild(head);
       dialog.appendChild(slot);
+      if (progress) dialog.appendChild(progress);
       dialog.appendChild(btns);
       mask.appendChild(dialog);
       root.appendChild(mask);
@@ -1024,24 +1111,48 @@
 
     window.BHChat.on('self-update', function (result) {
       if (!result || result.action !== 'dialog' || !result.available || result.ignored) return;
+      if (onboardBlocksUpdate()) {
+        state.queued = result;
+        return;
+      }
       state.result = result;
       state.applying = false;
       state.percent = 0;
       state.error = result.error || '';
       renderDialog();
     });
+    window.BHChat.on('onboard-inactive', function () {
+      if (!state.queued) return;
+      var queued = state.queued;
+      state.queued = null;
+      if (!queued.available || queued.ignored) return;
+      state.result = queued;
+      state.applying = false;
+      state.percent = 0;
+      state.error = queued.error || '';
+      renderDialog();
+    });
     window.BHChat.on('self-update-progress', function (progress) {
       if (!state.applying) return;
-      var received = progress && progress.received ? progress.received : 0;
-      var total = progress && progress.total ? progress.total : 0;
-      state.percent = total ? Math.min(100, Math.round((received / total) * 100)) : 0;
-      var title = host().querySelector('.title');
-      if (title) title.textContent = '正在下载 (' + state.percent + '%)';
+      state.percent = downloadPercent(progress);
+      var root = host();
+      var title = root.querySelector('.title');
+      if (title) title.textContent = '正在下载';
+      var bar = root.querySelector('.bhchat-update-progress-bar');
+      if (bar) bar.style.width = state.percent + '%';
+      var pct = root.querySelector('.bhchat-update-progress-pct');
+      if (pct) pct.textContent = state.percent + '%';
     });
   }
 
   function waitSelfUpdateUi() {
     attachSelfUpdateUi();
+    if (window.BHChat && window.BHChat.on && !window.__bhchat_open_panel_hook__) {
+      window.__bhchat_open_panel_hook__ = true;
+      window.BHChat.on('open-panel', function (id) {
+        pendingPanelId = id || '';
+      });
+    }
     if (!window.__bhchat_update_ui__) setTimeout(waitSelfUpdateUi, 400);
   }
   waitSelfUpdateUi();

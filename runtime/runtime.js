@@ -449,19 +449,35 @@
       return Promise.reject(new Error('更新模块未就绪'));
     }
     return loadUpdateMirror().then(function (mirror) {
-      return api.downloadInstaller({
-        manifest: remote,
-        mirror: mirror,
-        onProgress: function (progress) {
-          if (window.BHChat && window.BHChat.emit) {
-            window.BHChat.emit('self-update-progress', progress);
-          }
-        },
-      }).then(function (exePath) {
-        api.cleanupOldInstallers(remote.artifact);
-        api.launchInstaller(exePath, api.resolveInstallRoot());
-        return { ok: true, launched: true };
-      });
+      function emitProgress(progress) {
+        if (window.BHChat && window.BHChat.emit && progress) {
+          window.BHChat.emit('self-update-progress', progress);
+        }
+      }
+      var timer = setInterval(function () {
+        if (api.lastProgress) emitProgress(api.lastProgress());
+      }, 150);
+      return Promise.resolve(
+        api.downloadInstaller({
+          manifest: remote,
+          mirror: mirror,
+        }),
+      )
+        .then(function (exePath) {
+          api.cleanupOldInstallers(remote.artifact);
+          api.launchInstaller(exePath, api.resolveInstallRoot());
+          return { ok: true, launched: true };
+        })
+        .then(
+          function (result) {
+            clearInterval(timer);
+            return result;
+          },
+          function (err) {
+            clearInterval(timer);
+            throw err;
+          },
+        );
     });
   }
 
@@ -649,6 +665,9 @@
       installRemote: function (opts) {
         return callPluginStore('installRemote', opts);
       },
+      installPreview: function (preview) {
+        return callPluginStore('installPreview', preview);
+      },
       readUserFile: function (id, rel) {
         var api = window.bhchatPreload && window.bhchatPreload.plugins;
         if (!api || typeof api.readUserFile !== 'function') return '';
@@ -743,6 +762,12 @@
         console.warn('[BetterHeyboxChat] openSettings failed:', err);
       }
       return false;
+    },
+
+    openPanel: function (panelId) {
+      this.openSettings('betterheyboxchat');
+      if (panelId && this.emit) this.emit('open-panel', panelId);
+      return true;
     },
 
     _registerPlugin: function (manifest, loaded) {
