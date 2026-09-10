@@ -211,6 +211,7 @@ BHChat.openSettings('betterheyboxchat');
 - 频道内收藏/取消收藏他人语音包后，补发官方 `Refresh_User_Laughter`（与语音包平台收藏相同）
 - 监听 Vuex `SET_FAVORITE_VOICE_PACK_IDS`；不写死模块数字 ID，不伪造收藏协议
 - 左下角输入/输出设备菜单设备过多时限制高度、列表可滚动，按键说话和音量留在视口内
+- 官方 `comment/create` 在 query 补 web 同款 `_rnd`（HMAC，不改 body、不写死 webpack ID）
 
 官方货架 `screen-share-danmaku`：
 

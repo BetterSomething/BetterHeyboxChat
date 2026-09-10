@@ -275,6 +275,7 @@ BHChat.openRoomBgPanel()
 ```javascript
 BHChat.miscFix.getSettings()
 BHChat.miscFix.getStatus()
+BHChat.miscFix.getCommentStatus()
 BHChat.miscFix.refreshLaughter()
 BHChat.laughterFav.refresh()
 BHChat.laughterFav.getStatus()
