@@ -203,6 +203,13 @@
     }
   }
 
+  function syncPerfFlagsIfDisabled() {
+    if (isPluginEnabled('perf-tune')) return;
+    if (window.bhchatPreload && window.bhchatPreload.perf && window.bhchatPreload.perf.setConfig) {
+      return window.bhchatPreload.perf.setConfig({ enabled: false });
+    }
+  }
+
   function notifyClientUpdate(info) {
     lastClientUpdate = info || lastClientUpdate;
     if (!lastClientUpdate) return lastClientUpdate;
@@ -224,6 +231,9 @@
     return persistEnabledMap().then(function () {
       if (id === 'block-update' && !enabled) {
         syncBlockFlagsIfDisabled();
+      }
+      if (id === 'perf-tune' && !enabled) {
+        syncPerfFlagsIfDisabled();
       }
       if (window.BHChat) {
         window.BHChat.emit('plugin-enabled-changed', { id: id, enabled: !!enabled });
@@ -523,8 +533,30 @@
 
     _notifyClientUpdate: notifyClientUpdate,
 
+    perf: {
+      getStatus: function () {
+        return callPreloadNs('perf', 'getStatus');
+      },
+      setConfig: function (partial) {
+        return callPreloadNs('perf', 'setConfig', partial);
+      },
+      getWindowState: function () {
+        return callPreloadNs('perf', 'windowState');
+      },
+      lightReclaim: function () {
+        return callPreloadNs('perf', 'lightReclaim');
+      },
+      trimWorkingSet: function () {
+        return callPreloadNs('perf', 'trimWorkingSet');
+      },
+      getMemory: function () {
+        return callPreloadNs('perf', 'getMemory');
+      },
+    },
+
     _ready: function () {
       syncBlockFlagsIfDisabled();
+      syncPerfFlagsIfDisabled();
       if (window.bhchatPreload && window.bhchatPreload.patch) {
         notifyClientUpdate(window.bhchatPreload.patch.getStatus());
       }

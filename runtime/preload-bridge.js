@@ -207,6 +207,45 @@
         return ipcRenderer.invoke('bhchat:cookies-make-embeddable', opts || {});
       },
     },
+    perf: {
+      getStatus: function () {
+        return ipcRenderer.invoke('bhchat:perf-get-status');
+      },
+      setConfig: function (partial) {
+        return ipcRenderer.invoke('bhchat:perf-set-config', partial || {});
+      },
+      windowState: function () {
+        return ipcRenderer.invoke('bhchat:perf-window-state');
+      },
+      lightReclaim: function () {
+        var result = { ok: true, cache: false, gc: false, http: false };
+        try {
+          var electron = require('electron');
+          if (electron.webFrame && typeof electron.webFrame.clearCache === 'function') {
+            electron.webFrame.clearCache();
+            result.cache = true;
+          }
+        } catch (err) {}
+        try {
+          if (typeof gc === 'function') {
+            gc();
+            result.gc = true;
+          }
+        } catch (err) {}
+        return ipcRenderer.invoke('bhchat:perf-clear-http-cache').then(function (http) {
+          result.http = !!(http && http.ok);
+          return result;
+        }).catch(function () {
+          return result;
+        });
+      },
+      trimWorkingSet: function () {
+        return ipcRenderer.invoke('bhchat:perf-trim');
+      },
+      getMemory: function () {
+        return ipcRenderer.invoke('bhchat:perf-memory');
+      },
+    },
   };
 
   console.log('[BetterHeyboxChat] preload bridge loaded');

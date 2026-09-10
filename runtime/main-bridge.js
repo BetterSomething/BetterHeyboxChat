@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const patchGuard = require('./lib/patch-guard.js');
 const guestPolicy = require('./lib/guest-policy.js');
+const perfPolicy = require('./lib/perf-policy.js');
 const guestWatches = new Map();
 
 const FLAG_PATH = path.join(__dirname, 'devtools.disabled');
@@ -115,6 +116,12 @@ function attachExisting(mod) {
 
 function patchElectron(mod) {
   if (!mod || !mod.app || mod.app.__bhchat_dt) return;
+
+  try {
+    perfPolicy.applyCommandLine(mod.app, perfPolicy.effectiveConfig());
+  } catch (err) {
+    console.warn('[BetterHeyboxChat] apply perf switches failed:', err);
+  }
 
   mod.app.__bhchat_dt = true;
   function attachUpdateFilter(ses) {
@@ -259,7 +266,57 @@ function patchElectron(mod) {
         return guestPolicy.summarizeEmbedResult({ ok: false, changed: 0 });
       }
     });
+    mod.ipcMain.handle('bhchat:perf-get-status', async (event) => {
+      const config = perfPolicy.effectiveConfig();
+      const win = senderWindow(mod, event);
+      return Object.assign(perfPolicy.getRuntimeStatus(config), {
+        window: perfPolicy.windowStateFrom(win),
+      });
+    });
+    mod.ipcMain.handle('bhchat:perf-set-config', async (_event, partial) => {
+      const config = perfPolicy.writeConfig(partial || {});
+      return {
+        config: config,
+        needsRestart: perfPolicy.needsRestart(config),
+      };
+    });
+    mod.ipcMain.handle('bhchat:perf-window-state', async (event) => {
+      return perfPolicy.windowStateFrom(senderWindow(mod, event));
+    });
+    mod.ipcMain.handle('bhchat:perf-clear-http-cache', async (event) => {
+      try {
+        const sender = event && event.sender;
+        if (!sender || sender.isDestroyed() || !sender.session || typeof sender.session.clearCache !== 'function') {
+          return { ok: false };
+        }
+        await sender.session.clearCache();
+        return { ok: true };
+      } catch (err) {
+        console.warn('[BetterHeyboxChat] clear http cache failed:', err);
+        return { ok: false };
+      }
+    });
+    mod.ipcMain.handle('bhchat:perf-memory', async () => {
+      return perfPolicy.collectAppMemory(mod);
+    });
+    mod.ipcMain.handle('bhchat:perf-trim', async (event) => {
+      const config = perfPolicy.effectiveConfig();
+      if (!config.enabled) return { ok: false, error: 'disabled', trimmed: 0 };
+      const pids = perfPolicy.collectAppPids(mod, event && event.sender);
+      return perfPolicy.emptyWorkingSet(pids);
+    });
   }
+}
+
+function senderWindow(mod, event) {
+  try {
+    const sender = event && event.sender;
+    if (!sender || sender.isDestroyed()) return null;
+    if (mod.BrowserWindow && typeof mod.BrowserWindow.fromWebContents === 'function') {
+      return mod.BrowserWindow.fromWebContents(sender);
+    }
+  } catch (err) {}
+  return null;
 }
 
 const originalLoad = Module._load;
