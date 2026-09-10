@@ -1,20 +1,18 @@
 # BetterHeyboxChat  
 
-[![CI](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/ci.yml/badge.svg)](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/ci.yml)  
-[![Release installer](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/release.yml/badge.svg)](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/release.yml)  
-[![Dev installer](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/dev.yml/badge.svg)](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/dev.yml)  
+[![CI](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/ci.yml/badge.svg)](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/ci.yml)  [![Release installer](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/release.yml/badge.svg)](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/release.yml)  [![Dev installer](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/dev.yml/badge.svg)](https://github.com/BetterSomething/BetterHeyboxChat/actions/workflows/dev.yml)  
 ---
 
 [假装这里有个 LOGO, LOGO 位招猪]  
 
-[黑盒语音](https://chat.xiaoheihe.cn/) Windows 客户端增强插件框架  
+[黑盒语音](https://chat.xiaoheihe.cn/) **Windows** 客户端增强插件框架  
 
-当前同时支持黑盒语音 **1.56.0 / 1.57.0**  
+当前已支持黑盒语音 **1.56.0 / 1.57.0**  
 
 ## 安装
 
 (若黑盒语音安装在 `Program Files` , 则安装器需要管理员权限)  
-若安装时黑盒语音已在运行, GUI 安装器会在安装/卸载后自动重启客户端
+若安装时黑盒语音已在运行, GUI 安装器会在安装/卸载后自动重启客户端并恢复原来的状态(恢复状态仅升级可用)
 
 ### GUI 一键傻瓜图形安装器
 
