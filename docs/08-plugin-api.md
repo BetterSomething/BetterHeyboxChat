@@ -164,6 +164,21 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 
 框架内部用。`capture()` 立刻写快照；`markRestart()` 写快照 + 恢复标记；`restore()` 消费标记并按快照 `$jump` / `router.push`。
 
+### `BHChat.perf`
+
+通用性能面，不含业务策略。配置在数据根 `perf-tune.json`。启动开关必须在 Chromium 起来之前加上，改完可能要重启。1.56.0 / 1.57.0 都先探测再调用。
+
+| 方法 | 说明 |
+| --- | --- |
+| `getStatus()` | `{ config, applied, needsRestart, window, lastTrim }` |
+| `setConfig({ enabled, mode })` | `mode` 为 `'A'` / `'B'` / `'C'`。返回 `{ config, needsRestart }` |
+| `getWindowState()` | `{ visible, minimized, focused, ok }`。读失败时 `ok=false` |
+| `lightReclaim()` | 清 WebKit 缓存、尽量 `gc()`、清 session HTTP 缓存。不关功能 |
+| `trimWorkingSet()` | 对本应用子进程 `EmptyWorkingSet`。一分钟最多一次；失败不抛 |
+| `getMemory()` | 本应用全部子进程工作集之和（KB）。`{ ok, workingSetKb, processes }` |
+
+不要在语音 / 共享中调用 `trimWorkingSet`。窗口是否该压由插件判断。不关硬件加速，不加 `--single-process`。
+
 ### `BHChat.plugins`
 
 用户插件装载（preload 实现）。安装/卸载后需重启才加载脚本。
@@ -255,9 +270,12 @@ BHChat.roomBg.openPanel()
 BHChat.openRoomBgPanel()
 ```
 
-`laughter-fav-fix` 启用后挂载：
+`misc-fix` 启用后挂载（含原 `laughter-fav-fix`）：
 
 ```javascript
+BHChat.miscFix.getSettings()
+BHChat.miscFix.getStatus()
+BHChat.miscFix.refreshLaughter()
 BHChat.laughterFav.refresh()
 BHChat.laughterFav.getStatus()
 BHChat.laughterFav.getSettings()
@@ -292,6 +310,13 @@ BHChat.officialRoomDeco.applying()
 
 ```javascript
 BHChat.exportCredentials.snapshot()
+```
+
+`perf-tune` 启用后挂载：
+
+```javascript
+BHChat.perfTune.getSettings()
+BHChat.perfTune.getStatus()
 ```
 
 `heybox-dev-mcp` 启用后挂载（本机 `127.0.0.1` HTTP 桥，给 Cursor MCP 用；**不要**把握手 token / pkey 写入仓库）：

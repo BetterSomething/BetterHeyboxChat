@@ -206,10 +206,11 @@ BHChat.openSettings('betterheyboxchat');
 - 只朗读当前正在看的频道的**新**消息（`channel_data` / `channelIMId` / 语音频道，含语音房文字），用 `window.speechSynthesis` 排队播放
 - `registerPanel` 提供语速、音量、是否读昵称、测试朗读、立即停止
 
-官方货架 `laughter-fav-fix`：
+官方货架 `misc-fix`（含原 `laughter-fav-fix`）：
 
 - 频道内收藏/取消收藏他人语音包后，补发官方 `Refresh_User_Laughter`（与语音包平台收藏相同）
 - 监听 Vuex `SET_FAVORITE_VOICE_PACK_IDS`；不写死模块数字 ID，不伪造收藏协议
+- 左下角输入/输出设备菜单设备过多时限制高度、列表可滚动，按键说话和音量留在视口内
 
 官方货架 `screen-share-danmaku`：
 
@@ -222,6 +223,13 @@ BHChat.openSettings('betterheyboxchat');
 - 设置页探测官方全员房间背景写接口；忽略客户端 `can_change_bg_pic` / `room_decorate`
 - 换图走官方 `uploadCustomFile({ source: 'room_deco_pic' })`，保存走官方 decorate `DC` → `POST /chatroom/v2/room/decorate`（按工厂源码探测 `DC` / `uploadCustomFile`，不写死 webpack 数字 ID）
 - 服务端仍可能拒绝；结果 JSON 打在设置页上
+
+官方货架 `perf-tune`：
+
+- 默认档 A：只在托盘闲置且不在语音/共享时归还工作集；仍加 `aggressive-cache-discard` 和 64MB 磁盘缓存
+- 高级档：进阶（可见闲置也压）、激进（2 分钟闲置 + `--in-process-gpu`）。不关硬件加速 / 覆盖层 / AI 降噪
+- 策略在插件；特权走 `BHChat.perf`。官方 `setLimit` 运行时探测，不写死 webpack 数字 ID
+- 右下角角标旁显示本应用工作集当前 / 本次最高 / 最低（`BHChat.perf.getMemory`）
 
 官方货架 `block-update`：
 
