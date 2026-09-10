@@ -467,7 +467,7 @@
           this.plugins.length === 1 && this.plugins[0] && this.plugins[0].id === 'marketplace';
         var pluginChildren = [
           h('div', { class: 'cell-title' }, '已安装插件'),
-          h('div', { class: 'bhchat-list' }, pluginRows),
+          h('div', { class: 'bhchat-list bhchat-plugin-list no-reset-scrollbar' }, pluginRows),
         ];
         if (onlyMarketplace) {
           pluginChildren.push(
@@ -584,6 +584,12 @@
     style.id = 'bhchat-native-settings-style';
     style.textContent = [
       '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-list{border-radius:5px;overflow:hidden}',
+      '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-list.bhchat-plugin-list{max-height:min(42vh,360px);overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--opacity-3,rgba(255,255,255,.35)) transparent}',
+      '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-plugin-list::-webkit-scrollbar{width:8px;height:8px}',
+      '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-plugin-list::-webkit-scrollbar-track{background:transparent}',
+      '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-plugin-list::-webkit-scrollbar-thumb{background:var(--opacity-3,rgba(255,255,255,.35));border-radius:8px}',
+      'html[theme=light] .cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-plugin-list,body[theme=light] .cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-plugin-list{scrollbar-color:var(--opacity-3,rgba(0,0,0,.28)) transparent}',
+      'html[theme=light] .cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-plugin-list::-webkit-scrollbar-thumb,body[theme=light] .cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-plugin-list::-webkit-scrollbar-thumb{background:var(--opacity-3,rgba(0,0,0,.28))}',
       '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-list .row{text-align:left}',
       '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-list .row+.row{box-shadow:inset 0 1px 0 var(--opacity-1,rgba(255,255,255,.06))}',
       '.betterheyboxchat-setting-block .bhchat-row-click{cursor:pointer}',

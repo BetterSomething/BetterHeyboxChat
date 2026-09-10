@@ -815,7 +815,7 @@
             ],
           );
         });
-        children.push(h('div', { class: 'bhchat-list' }, catalogRows));
+        children.push(h('div', { class: 'bhchat-list bhchat-plugin-list no-reset-scrollbar' }, catalogRows));
         children.push(h('div', { class: 'cell-title' }, '本地安装'));
         children.push(
           h('div', { class: 'bhchat-actions' }, [
@@ -926,7 +926,7 @@
         children.push(
           h(
             'div',
-            { class: 'bhchat-list' },
+            { class: 'bhchat-list bhchat-plugin-list no-reset-scrollbar' },
             userRows.length ? userRows : [h('p', { class: 'bhchat-hint' }, '还没有安装的用户插件。')],
           ),
         );
