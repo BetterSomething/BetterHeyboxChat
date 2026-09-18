@@ -7,7 +7,7 @@
 
 | 项   | 值                                                      |
 | --- | ------------------------------------------------------ |
-| 客户端 | 黑盒语音 **1.56.0 / 1.57.0**（须同时兼容，见下方「版本兼容」） |
+| 客户端 | 黑盒语音 **1.56.0 / 1.57.0 / 1.57.1**（须同时兼容，见下方「版本兼容」） |
 | 前端  | Vue **2.7 runtime-only** + Vuex + Webpack              |
 | 注入点 | 渲染进程；不要改主进程 `.jsm`                                     |
 | 调试  | 安装后 `F12` / `Ctrl+Shift+I`；右下角 **BHC vx.x.x** 角标表示 runtime 已加载 |
@@ -46,7 +46,7 @@ BetterHeyboxChat-plugins/your-plugin/
 
 `id` 必须与目录名相同。`author`、`repository`、`desc` 会显示在设置页（仓库可点开）。`desc` 不超过 100 字，不要写 HTML。`enabled` 是默认值；用户可在设置里关掉，写入 `bhchat.plugins.enabled`，**重启后** loader 才跳过脚本。额外脚本写进 `files`，不要写死 `../betterheyboxchat/plugins/...`。
 
-`minClientVersion` 是**下限**，不是「只支持这一版」。兼容表里更新的客户端（现在是 1.57.0）只要不低于下限就会装、会加载。不要无故把下限抬到最新版。
+`minClientVersion` 是**下限**，不是「只支持这一版」。兼容表里更新的客户端（现在是 1.57.1）只要不低于下限就会装、会加载。不要无故把下限抬到最新版。
 
 用户插件用设置页「插件市场」从在线货架安装，或导入本地 zip/文件夹。文件写到数据目录（默认 `%APPDATA%\BetterHeyboxChat\plugins\<id>\`）。官方示例与第三方投稿都在独立仓，发 PR 即可。
 
@@ -66,7 +66,7 @@ BetterHeyboxChat-plugins/
 
 ## 版本兼容
 
-框架安装器 / loader 的 `SUPPORTED_CLIENT_VERSIONS` 当前是 `1.56.0`、`1.57.0`。**文档、框架代码、货架插件都按「表内全部版本」写**，不要写死「仅 1.56」或「仅 1.57」。
+框架安装器 / loader 的 `SUPPORTED_CLIENT_VERSIONS` 当前是 `1.56.0`、`1.57.0`、`1.57.1`。**文档、框架代码、货架插件都按「表内全部版本」写**，不要写死「仅 1.56」或「仅 1.57」。
 
 | 方向 | 含义 | 做法 |
 | --- | --- | --- |
@@ -77,7 +77,7 @@ BetterHeyboxChat-plugins/
 
 1. 插件优先走 `BHChat` 稳定面（`mapState` / `watch` / EventBus 经框架、`storage`），不要写死 `__bhchat_require__(数字)`。
 2. 必须碰官方模块或 DOM 时：先确认工厂 / 节点 / 函数存在，再调用。参考 `screen-share-danmaku` 对 `$rtc.tryP2PReupgrade` 的处理。
-3. 1.56 是 Electron 33，1.57 是 Electron 43。渲染进程 Node API（`http` / `fs`）两边目前都有，但不要依赖某一 Electron 大版本才有的行为。
+3. 1.56 是 Electron 33，1.57.0 / 1.57.1 是 Electron 43。渲染进程 Node API（`http` / `fs`）两边目前都有，但不要依赖某一 Electron 大版本才有的行为。
 4. 文档写能力时列出**实测过的全部版本**；某一版没有的，写「该版无此 API，已降级」，不要写成整插件不可用。
 5. 兼容表新增版本时：先扩 `SUPPORTED_CLIENT_VERSIONS`，再改文档，再逐个插件核对。
 
@@ -238,6 +238,7 @@ BHChat.openPanel('marketplace'); // 打开设置并跳转插件市场
 - 阻断官方 `/chatroom/v2/settings/version/update/check`，检查失败则不弹更新窗
 - 开关写入 `betterheyboxchat/update-block.json`；main-bridge 用 session webRequest 取消该 API，IPC 只作兜底
 - 可调用 `BHChat.patch.ensure()` 立刻补回被热更新盖掉的 html / preload 注入
+- 跨代强制更新弹窗本身由**框架**补回「取消」，不依赖本插件；本插件负责下次启动不再检查更新
 
 官方货架 `export-credentials`：
 

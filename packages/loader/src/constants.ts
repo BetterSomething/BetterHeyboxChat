@@ -59,7 +59,7 @@ try { require('./betterheyboxchat/main-bridge.js'); } catch (e) { console.error(
 ${MARKER_END}
 `.trim();
 
-export const SUPPORTED_CLIENT_VERSIONS = ['1.56.0', '1.57.0'];
+export const SUPPORTED_CLIENT_VERSIONS = ['1.56.0', '1.57.0', '1.57.1'];
 
 export const PROGRAM_FILES_FOLDERS = ['Program Files', 'Program Files (x86)'];
 

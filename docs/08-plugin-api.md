@@ -2,7 +2,7 @@
 
 > 全局对象：`window.BHChat`  
 > 实现：`runtime/runtime.js`  
-> 兼容客户端：Heybox Chat **1.56.0 / 1.57.0**（与安装器 / loader 的 `SUPPORTED_CLIENT_VERSIONS` 对齐）  
+> 兼容客户端：Heybox Chat **1.56.0 / 1.57.0 / 1.57.1**（与安装器 / loader 的 `SUPPORTED_CLIENT_VERSIONS` 对齐）  
 > 写法示例见 [09-plugin-dev.md](./09-plugin-dev.md)
 
 插件只应依赖本页列出的稳定面。`window.__bhchat_require__`、`window.__bhchat_module_map__` 是内部实现，换版本可能失效。同一份插件必须能在兼容表里的**所有**客户端上加载；某一版本没有的 API 要探测后降级，不要写成「仅某某版本」。
@@ -200,7 +200,7 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 
 ### `BHChat.perf`
 
-通用性能面，不含业务策略。配置在数据根 `perf-tune.json`。启动开关必须在 Chromium 起来之前加上，改完可能要重启。1.56.0 / 1.57.0 都先探测再调用。
+通用性能面，不含业务策略。配置在数据根 `perf-tune.json`。启动开关必须在 Chromium 起来之前加上，改完可能要重启。1.56.0 / 1.57.0 / 1.57.1 都先探测再调用。
 
 | 方法 | 说明 |
 | --- | --- |
@@ -333,7 +333,7 @@ BHChat.blockUpdate.getStatus()
 BHChat.blockUpdate.ensurePatch()
 ```
 
-`official-room-deco` 启用后挂载（1.56.0 / 1.57.0；走官方 `uploadCustomFile` + `POST /chatroom/v2/room/decorate`，忽略客户端 `can_change_bg_pic`）：
+`official-room-deco` 启用后挂载（1.56.0 / 1.57.0 / 1.57.1；走官方 `uploadCustomFile` + `POST /chatroom/v2/room/decorate`，忽略客户端 `can_change_bg_pic`）：
 
 ```javascript
 BHChat.officialRoomDeco.snapshot()
@@ -370,4 +370,4 @@ BHChat.heyboxDevMcp.stop()
 - 事件 handler、`onReady` 回调内的异常只打日志
 - `watch` / `mapState` 在 store 未就绪时降级，不要假设启动瞬间一定有房间数据
 - 设置组件必须 `render(h)`；`template` 会渲染成空白
-- webpack 模块 ID 是内部实现：1.56.0 / 1.57.0 当前相同，但换版本可能变。插件不要写死数字 ID；必须用时先探测导出（如 `typeof api.DC === 'function'`），没有就降级
+- webpack 模块 ID 是内部实现：1.56.0 / 1.57.0 / 1.57.1 当前相同，但换版本可能变。插件不要写死数字 ID；必须用时先探测导出（如 `typeof api.DC === 'function'`），没有就降级

@@ -25,10 +25,22 @@ pub const INDEX_SNIPPET: &str = r"// BetterHeyboxChat:begin
 try { require('./betterheyboxchat/main-bridge.js'); } catch (e) { console.error('[BetterHeyboxChat] main bridge failed:', e); }
 // BetterHeyboxChat:end";
 
-pub const SUPPORTED_CLIENT_VERSIONS: &[&str] = &["1.56.0", "1.57.0"];
+pub const SUPPORTED_CLIENT_VERSIONS: &[&str] = &["1.56.0", "1.57.0", "1.57.1"];
 
 pub const HEYBOX_DISPLAY_NAME_HINTS: &[&str] =
     &["heybox", "黑盒语音", "黑盒", "heybox chat"];
 
 pub const MANIFEST_FILE: &str = "install.json";
 pub const BACKUP_DIR: &str = ".backup";
+
+#[cfg(test)]
+mod tests {
+    use super::SUPPORTED_CLIENT_VERSIONS;
+
+    #[test]
+    fn compat_table_includes_1571() {
+        assert!(SUPPORTED_CLIENT_VERSIONS.contains(&"1.56.0"));
+        assert!(SUPPORTED_CLIENT_VERSIONS.contains(&"1.57.0"));
+        assert!(SUPPORTED_CLIENT_VERSIONS.contains(&"1.57.1"));
+    }
+}

@@ -1,5 +1,5 @@
 /**
- * BetterHeyboxChat Webpack Hook（1.56.0 / 1.57.0）
+ * BetterHeyboxChat Webpack Hook（1.56.0 / 1.57.0 / 1.57.1）
  * 必须在 webpack 主包之前同步加载；并处理主包覆盖 push 的情况。
  */
 (function () {
@@ -832,6 +832,11 @@
     } catch (err) {
       console.warn('[BetterHeyboxChat] bootstrap UserConfig patch failed:', err);
     }
+    try {
+      patchLoadedUpdateDialog(requireFn);
+    } catch (err) {
+      console.warn('[BetterHeyboxChat] bootstrap UpdateDialog patch failed:', err);
+    }
   }
 
   function onModuleLoaded(id, exports) {
@@ -845,28 +850,129 @@
     return false;
   }
 
+  function restoreOfficialUpdateCancel(vm) {
+    if (!vm || !vm.updateConfig) return false;
+    if (vm.isUpdating || vm.isExtracting) return false;
+    if (vm.onlyShowLogs || vm.relaunchReady) return false;
+    var cancel = vm.updateConfig.cancel;
+    if (cancel && cancel.text) return false;
+    if (typeof vm.$set === 'function') {
+      vm.$set(vm.updateConfig, 'cancel', { text: '取消' });
+    } else {
+      vm.updateConfig.cancel = { text: '取消' };
+    }
+    if (typeof vm.$forceUpdate === 'function') vm.$forceUpdate();
+    return true;
+  }
+
+  function findOfficialUpdateDialogVm(el) {
+    var vm = el && el.__vue__;
+    while (vm) {
+      var name = vm.$options && vm.$options.name;
+      if (name === 'UpdateDialog') return vm;
+      if (vm.updateConfig && typeof vm.setUpdateConfig === 'function') return vm;
+      vm = vm.$parent;
+    }
+    return null;
+  }
+
+  function unlockOfficialUpdateDialogEl(el) {
+    var vm = findOfficialUpdateDialogVm(el);
+    if (!vm) return false;
+    if (!restoreOfficialUpdateCancel(vm)) return false;
+    if (!vm.__bhchat_update_unlocked) {
+      vm.__bhchat_update_unlocked = true;
+      console.log('[BetterHeyboxChat] official force-update dialog cancel restored');
+    }
+    return true;
+  }
+
+  function unlockOfficialUpdateDialogs(root) {
+    if (!root) return;
+    if (root.classList && root.classList.contains('cpt-update-dialog')) {
+      unlockOfficialUpdateDialogEl(root);
+    }
+    if (!root.querySelectorAll) return;
+    var nodes = root.querySelectorAll('.cpt-update-dialog');
+    for (var i = 0; i < nodes.length; i++) {
+      unlockOfficialUpdateDialogEl(nodes[i]);
+    }
+  }
+
+  function looksLikeUpdateDialogFactory(factory) {
+    if (typeof factory !== 'function' || factory.__bhchat_wrapped) return false;
+    var src = Function.prototype.toString.call(factory);
+    return src.indexOf('cpt-update-dialog') !== -1 && src.indexOf('setUpdateConfig') !== -1;
+  }
+
+  function patchUpdateDialogExports(exports) {
+    var comp = getVueComponent(exports);
+    if (!comp) return false;
+    var target = comp.options || comp;
+    var methods = target.methods;
+    if (!methods || typeof methods.setUpdateConfig !== 'function') return false;
+    if (target.name && target.name !== 'UpdateDialog') return false;
+    if (!target.name && Function.prototype.toString.call(methods.setUpdateConfig).indexOf('force_update') === -1) {
+      return false;
+    }
+    if (methods.setUpdateConfig.__bhchat_closable) return true;
+    var orig = methods.setUpdateConfig;
+    methods.setUpdateConfig = function () {
+      var result = orig.apply(this, arguments);
+      restoreOfficialUpdateCancel(this);
+      return result;
+    };
+    methods.setUpdateConfig.__bhchat_closable = true;
+    console.log('[BetterHeyboxChat] UpdateDialog setUpdateConfig patched');
+    return true;
+  }
+
+  function patchLoadedUpdateDialog(requireFn) {
+    if (!requireFn) return;
+    var factories = requireFn.m || {};
+    var ids = Object.keys(factories);
+    for (var i = 0; i < ids.length; i++) {
+      if (!looksLikeUpdateDialogFactory(factories[ids[i]])) continue;
+      try {
+        patchUpdateDialogExports(requireFn(ids[i]));
+      } catch (err) {}
+    }
+    var cache = requireFn.c || {};
+    var cacheIds = Object.keys(cache);
+    for (var j = 0; j < cacheIds.length; j++) {
+      var entry = cache[cacheIds[j]];
+      if (entry && entry.exports) patchUpdateDialogExports(entry.exports);
+    }
+  }
+
   function wrapFactory(id, factory) {
     return function (module, exports, require) {
       if (!window.__bhchat_require__) window.__bhchat_require__ = require;
       factory(module, exports, require);
       try {
         onModuleLoaded(String(id), exports);
+        patchUpdateDialogExports(exports);
       } catch (err) {
         console.error('[BetterHeyboxChat] module patch failed:', id, err);
       }
     };
   }
 
+  function wrapChunkModule(modules, id) {
+    if (!modules[id] || modules[id].__bhchat_wrapped) return;
+    modules[id] = wrapFactory(id, modules[id]);
+    modules[id].__bhchat_wrapped = true;
+  }
+
   function processChunk(chunk) {
     if (!chunk || !chunk[1]) return;
     var modules = chunk[1];
-    var ids = [MODULE_MAP.SETTINGS_BLOCKS, MODULE_MAP.USER_CONFIG];
-
-    for (var i = 0; i < ids.length; i++) {
-      var id = ids[i];
-      if (modules[id] && !modules[id].__bhchat_wrapped) {
-        modules[id] = wrapFactory(id, modules[id]);
-        modules[id].__bhchat_wrapped = true;
+    wrapChunkModule(modules, MODULE_MAP.SETTINGS_BLOCKS);
+    wrapChunkModule(modules, MODULE_MAP.USER_CONFIG);
+    var keys = Object.keys(modules);
+    for (var i = 0; i < keys.length; i++) {
+      if (looksLikeUpdateDialogFactory(modules[keys[i]])) {
+        wrapChunkModule(modules, keys[i]);
       }
     }
   }
@@ -1156,6 +1262,40 @@
     if (!window.__bhchat_update_ui__) setTimeout(waitSelfUpdateUi, 400);
   }
   waitSelfUpdateUi();
+
+  function installOfficialUpdateCloser() {
+    if (window.__bhchat_official_update_closer__) return;
+    window.__bhchat_official_update_closer__ = true;
+
+    function scan() {
+      try {
+        unlockOfficialUpdateDialogs(document);
+      } catch (err) {}
+    }
+
+    if (typeof MutationObserver === 'function') {
+      var root = document.documentElement || document.body;
+      if (root) {
+        var observer = new MutationObserver(function (records) {
+          for (var i = 0; i < records.length; i++) {
+            var added = records[i].addedNodes;
+            for (var j = 0; j < added.length; j++) {
+              var node = added[j];
+              if (!node || node.nodeType !== 1) continue;
+              unlockOfficialUpdateDialogs(node);
+            }
+          }
+        });
+        observer.observe(root, { childList: true, subtree: true });
+      }
+    }
+
+    scan();
+    setInterval(scan, 1000);
+    window.__bhchat_unlockOfficialUpdateDialog = scan;
+  }
+
+  installOfficialUpdateCloser();
 
   window.__bhchat_webpack_hook__ = true;
   console.log('[BetterHeyboxChat] webpack hook installed');

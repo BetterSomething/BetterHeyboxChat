@@ -188,12 +188,30 @@ async function testReinstall() {
   }
 }
 
+async function testClientCompat() {
+  if (!fs.existsSync(patchJs)) {
+    throw new Error('缺少 packages/loader/dist/patch.js，请先 pnpm build');
+  }
+  const { assertClientSupported } = await import(pathToFileURL(patchJs).href);
+  assertClientSupported('1.56.0');
+  assertClientSupported('1.57.0');
+  assertClientSupported('1.57.1');
+  let rejected = false;
+  try {
+    assertClientSupported('1.99.0');
+  } catch (err) {
+    rejected = String(err && err.message).includes('1.57.1');
+  }
+  assert(rejected, '兼容表应含 1.57.1，并拒绝未列入版本');
+}
+
 const steps = [
   ['versioning', testVersioning],
   ['self-update-compare', testSelfUpdateCompare],
   ['map-limit', testMapLimit],
   ['cli-help', testCliHelp],
   ['reinstall', testReinstall],
+  ['client-compat', testClientCompat],
 ];
 
 let failed = 0;
