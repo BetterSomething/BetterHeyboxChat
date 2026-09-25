@@ -82,7 +82,25 @@
       return store.watch(getter, callback);
     }
     var last = getter();
-    var timer = setInterval(function () {
+    var timer = null;
+    var vueUnwatch = null;
+    var stopped = false;
+    function stop() {
+      stopped = true;
+      if (timer) clearInterval(timer);
+      timer = null;
+      if (typeof vueUnwatch === 'function') vueUnwatch();
+      vueUnwatch = null;
+    }
+    timer = setInterval(function () {
+      if (stopped) return;
+      var nextStore = getStore();
+      if (nextStore && typeof nextStore.watch === 'function') {
+        clearInterval(timer);
+        timer = null;
+        vueUnwatch = nextStore.watch(getter, callback);
+        return;
+      }
       var next = getter();
       if (next !== last) {
         var prev = last;
@@ -94,9 +112,7 @@
         }
       }
     }, 500);
-    return function unwatch() {
-      clearInterval(timer);
-    };
+    return stop;
   }
 
   function getBackingStorage() {
@@ -746,7 +762,7 @@
 
     openSettings: function (blockKey) {
       blockKey = blockKey || 'betterheyboxchat';
-      if (window.__bhchat_bootstrap_patch__) {
+      if (!window.__bhchat_require__ && window.__bhchat_bootstrap_patch__) {
         window.__bhchat_bootstrap_patch__();
       }
       if (!window.__bhchat_require__) return false;

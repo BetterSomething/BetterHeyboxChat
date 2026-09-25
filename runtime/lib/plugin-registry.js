@@ -40,7 +40,7 @@ function resolveBase(mirror) {
   if (!raw) return DEFAULT_BASE;
   var prefix = normalizeMirrorPrefix(raw);
   if (!prefix) return '';
-  return prefix + GITHUB_WEB_BASE;
+  return prefix + DEFAULT_BASE;
 }
 
 function collectRemoteRelPaths(manifest) {

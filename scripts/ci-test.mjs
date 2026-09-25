@@ -18,6 +18,7 @@ import {
 const require = createRequire(import.meta.url);
 const selfUpdate = require('../runtime/lib/self-update.js');
 const pluginRegistry = require('../runtime/lib/plugin-registry.js');
+const sessionRestore = require('../runtime/lib/session-restore.js');
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const patchJs = path.join(root, 'packages/loader/dist/patch.js');
@@ -39,8 +40,8 @@ function testVersioning() {
   const tagged = resolveBuild({ bhcVersion: '', exactTag: 'v0.3.0', shortSha: 'abc1234' });
   assert(tagged.version === '0.3.0' && tagged.channel === 'release', 'tag 应走正式版');
 
-  const dev = resolveBuild({ bhcVersion: '', exactTag: '', shortSha: 'c73b142' });
-  assert(dev.version === 'c73b142' && dev.channel === 'dev', '短 SHA 应走开发版');
+  const dev = resolveBuild({ bhcVersion: '', exactTag: '', shortSha: 'c73b142', releaseVersion: '1.1.0' });
+  assert(dev.version === '1.1.0' && dev.channel === 'dev' && dev.commit === 'c73b142', '开发版版本号沿用最近正式版，提交号单独放 commit');
 
   assert(pickReleaseTag(['v0.1.0', 'v0.2.0', 'dev']) === 'v0.2.0', '应取最大 semver tag');
 
@@ -91,6 +92,13 @@ function testSelfUpdateCompare() {
     '开发版短 SHA 前缀相同则已最新',
   );
   assert(
+    !selfUpdate.hasUpdate(
+      { channel: 'dev', version: '1.1.0', commit: '15231ed' },
+      { version: '15231ed', commit: '15231ed' },
+    ),
+    '开发版版本号是 semver 时按 commit 判断，相同提交不算更新',
+  );
+  assert(
     selfUpdate.hasUpdate({ channel: 'dev', version: 'a4c21a4' }, { version: '085340d' }),
     '开发版 SHA 不同则有更新',
   );
@@ -118,6 +126,55 @@ function testSelfUpdateCompare() {
     '分段应首尾相接',
   );
   assert(selfUpdate.splitRanges(100, 4).length === 1, '过小文件不应拆段');
+
+  const hash = selfUpdate.sha256Buffer(Buffer.from('bhchat'));
+  assert(selfUpdate.assertInstallerSha256({ sha256: hash }, Buffer.from('bhchat')) === hash, 'sha256 一致应通过');
+  let missingSha = false;
+  try {
+    selfUpdate.assertInstallerSha256({ sha256: '' }, Buffer.from('bhchat'));
+  } catch (err) {
+    missingSha = String(err && err.message).includes('缺少 sha256');
+  }
+  assert(missingSha, '没有 sha256 应拒绝安装');
+}
+
+function testRegistryMirror() {
+  const base = pluginRegistry.resolveBase('https://gh.example.test/');
+  assert(base.includes('raw.githubusercontent.com'), '镜像应拼 raw 基址');
+  assert(!base.includes('/blob/'), '镜像不应拼 blob 页面');
+  assert(pluginRegistry.resolveBase('') === pluginRegistry.DEFAULT_BASE, '无镜像应使用默认 raw');
+}
+
+function testSnapshotIdentity() {
+  const a = sessionRestore.collectSnapshot({
+    now: 1,
+    routeName: 'channel',
+    routePath: '/app/r/1',
+    roomId: '1',
+    textChannelId: '2',
+    voiceRoomId: '1',
+    voiceChannelId: '3',
+  });
+  const b = sessionRestore.collectSnapshot({
+    now: 99,
+    routeName: 'channel',
+    routePath: '/app/r/1',
+    roomId: '1',
+    textChannelId: '2',
+    voiceRoomId: '1',
+    voiceChannelId: '3',
+  });
+  const c = sessionRestore.collectSnapshot({
+    now: 99,
+    routeName: 'channel',
+    routePath: '/app/r/1',
+    roomId: '1',
+    textChannelId: '9',
+    voiceRoomId: '1',
+    voiceChannelId: '3',
+  });
+  assert(sessionRestore.snapshotIdentity(a) === sessionRestore.snapshotIdentity(b), '时间不同但页面相同则身份相同');
+  assert(sessionRestore.snapshotIdentity(a) !== sessionRestore.snapshotIdentity(c), '频道变化应改变身份');
 }
 
 async function testMapLimit() {
@@ -208,6 +265,8 @@ async function testClientCompat() {
 const steps = [
   ['versioning', testVersioning],
   ['self-update-compare', testSelfUpdateCompare],
+  ['registry-mirror', testRegistryMirror],
+  ['snapshot-identity', testSnapshotIdentity],
   ['map-limit', testMapLimit],
   ['cli-help', testCliHelp],
   ['reinstall', testReinstall],

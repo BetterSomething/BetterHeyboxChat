@@ -80,8 +80,12 @@ mod platform {
     use std::process::Command;
 
     pub fn is_process_running(image_name: &str) -> bool {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
         let output = Command::new("tasklist")
             .args(["/FI", &format!("IMAGENAME eq {image_name}"), "/NH"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output();
 
         match output {
@@ -95,8 +99,13 @@ mod platform {
     }
 
     pub fn kill_process(image_name: &str) -> Result<(), String> {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+        // 不要 /T。自更新把安装器从黑盒语音拉起，/T 会把安装器一起杀掉，文件还没写完。
         let status = Command::new("taskkill")
-            .args(["/F", "/IM", image_name, "/T"])
+            .args(["/F", "/IM", image_name])
+            .creation_flags(CREATE_NO_WINDOW)
             .status()
             .map_err(|e| format!("关闭黑盒语音失败: {e}"))?;
 

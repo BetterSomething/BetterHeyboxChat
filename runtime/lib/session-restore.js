@@ -69,6 +69,20 @@
     return !!hasIntent && isFresh(snapshot, now);
   }
 
+  function snapshotIdentity(snapshot) {
+    if (!snapshot) return '';
+    var view = snapshot.view || {};
+    var voice = snapshot.voice || {};
+    return [
+      view.name || '',
+      view.path || '',
+      view.roomId || '',
+      view.textChannelId || '',
+      voice.roomId || '',
+      voice.channelId || '',
+    ].join('\n');
+  }
+
   var exported = {
     TTL_MS: TTL_MS,
     SNAPSHOT_KEY: SNAPSHOT_KEY,
@@ -77,6 +91,7 @@
     collectSnapshot: collectSnapshot,
     buildPlan: buildPlan,
     shouldRestore: shouldRestore,
+    snapshotIdentity: snapshotIdentity,
   };
 
   if (typeof module !== 'undefined' && module.exports) {
@@ -89,6 +104,7 @@
 
   var saveTimer = null;
   var restoring = false;
+  var lastIdentity = '';
   var originalRestart = window.BHChat.restart;
 
   function getAppVue() {
@@ -218,9 +234,13 @@
     return Promise.resolve(storage.del(key));
   }
 
-  function persistLive() {
+  function persistLive(force) {
     if (restoring) return Promise.resolve();
-    return storageSet(SNAPSHOT_KEY, collectSnapshot(readLiveInput()));
+    var snapshot = collectSnapshot(readLiveInput());
+    var identity = snapshotIdentity(snapshot);
+    if (!force && identity === lastIdentity) return Promise.resolve();
+    lastIdentity = identity;
+    return storageSet(SNAPSHOT_KEY, snapshot);
   }
 
   function scheduleSave() {
@@ -234,7 +254,7 @@
 
   function markRestart() {
     writeIntentFile();
-    return persistLive().then(function () {
+    return persistLive(true).then(function () {
       return storageSet(INTENT_KEY, Date.now());
     });
   }

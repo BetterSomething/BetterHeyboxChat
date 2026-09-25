@@ -24,7 +24,7 @@ export function stripV(value) {
   return text.startsWith('v') ? text.slice(1) : text;
 }
 
-export function resolveBuild({ bhcVersion, exactTag, shortSha }) {
+export function resolveBuild({ bhcVersion, exactTag, shortSha, releaseVersion }) {
   const commit = String(shortSha || '').trim() || 'unknown';
   const forced = String(bhcVersion || '').trim();
   if (forced) {
@@ -42,7 +42,8 @@ export function resolveBuild({ bhcVersion, exactTag, shortSha }) {
   }
 
   if (commit !== 'unknown') {
-    return { version: commit, channel: 'dev', commit };
+    const base = String(releaseVersion || '').trim();
+    return { version: isSemver(base) ? base : '0.1.0', channel: 'dev', commit };
   }
 
   return { version: 'dev', channel: 'dev', commit: 'unknown' };
@@ -180,7 +181,7 @@ export function renderUpdateJson({ build, sha256, notes, publishedAt, tag }) {
       channel,
       commit: String(build.commit || version).trim(),
       tag: tag || (channel === 'release' ? `v${version}` : 'dev'),
-      artifact: installerArtifactName(version),
+      artifact: installerArtifactName(channel === 'dev' && build.commit && build.commit !== 'unknown' ? build.commit : version),
       sha256: String(sha256 || '').trim().toLowerCase().replace(/^sha256:/, ''),
       notes: String(notes || ''),
       publishedAt: publishedAt || new Date().toISOString(),

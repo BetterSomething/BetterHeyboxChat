@@ -818,22 +818,29 @@
 
   function applyKnownPatches(requireFn) {
     if (!requireFn) return;
+    if (settingsReady && userConfigReady && updateDialogPatched) return;
     try {
-      var mod = requireFn(MODULE_MAP.SETTINGS_BLOCKS);
-      if (mod && mod.Q4) patchSettingsBlocks(mod.Q4);
+      if (!settingsReady) {
+        var mod = requireFn(MODULE_MAP.SETTINGS_BLOCKS);
+        if (mod && mod.Q4 && (mod.Q4[PATCHED_MENU] || patchSettingsBlocks(mod.Q4))) {
+          settingsReady = true;
+        }
+      }
     } catch (err) {
       console.warn('[BetterHeyboxChat] bootstrap Q4 patch failed:', err);
     }
     try {
-      if (moduleFactoryReady(requireFn, MODULE_MAP.USER_CONFIG)) {
+      if (!userConfigReady && moduleFactoryReady(requireFn, MODULE_MAP.USER_CONFIG)) {
         var userMod = requireFn(MODULE_MAP.USER_CONFIG);
-        if (userMod) patchUserConfig(userMod);
+        if (userMod && (userMod[PATCHED_CONFIG] || patchUserConfig(userMod))) {
+          userConfigReady = true;
+        }
       }
     } catch (err) {
       console.warn('[BetterHeyboxChat] bootstrap UserConfig patch failed:', err);
     }
     try {
-      patchLoadedUpdateDialog(requireFn);
+      if (!updateDialogPatched) patchLoadedUpdateDialog(requireFn);
     } catch (err) {
       console.warn('[BetterHeyboxChat] bootstrap UpdateDialog patch failed:', err);
     }
@@ -899,10 +906,22 @@
     }
   }
 
+  var scannedUpdateFactoryIds = {};
+  var updateDialogPatched = false;
+  var settingsReady = false;
+  var userConfigReady = false;
+
   function looksLikeUpdateDialogFactory(factory) {
     if (typeof factory !== 'function' || factory.__bhchat_wrapped) return false;
+    if (factory.__bhchat_ud_scan === true || factory.__bhchat_ud_scan === false) {
+      return factory.__bhchat_ud_scan;
+    }
     var src = Function.prototype.toString.call(factory);
-    return src.indexOf('cpt-update-dialog') !== -1 && src.indexOf('setUpdateConfig') !== -1;
+    var hit = src.indexOf('cpt-update-dialog') !== -1 && src.indexOf('setUpdateConfig') !== -1;
+    try {
+      factory.__bhchat_ud_scan = hit;
+    } catch (err) {}
+    return hit;
   }
 
   function patchUpdateDialogExports(exports) {
@@ -915,7 +934,10 @@
     if (!target.name && Function.prototype.toString.call(methods.setUpdateConfig).indexOf('force_update') === -1) {
       return false;
     }
-    if (methods.setUpdateConfig.__bhchat_closable) return true;
+    if (methods.setUpdateConfig.__bhchat_closable) {
+      updateDialogPatched = true;
+      return true;
+    }
     var orig = methods.setUpdateConfig;
     methods.setUpdateConfig = function () {
       var result = orig.apply(this, arguments);
@@ -923,24 +945,33 @@
       return result;
     };
     methods.setUpdateConfig.__bhchat_closable = true;
+    updateDialogPatched = true;
     console.log('[BetterHeyboxChat] UpdateDialog setUpdateConfig patched');
     return true;
   }
 
   function patchLoadedUpdateDialog(requireFn) {
-    if (!requireFn) return;
+    if (!requireFn || updateDialogPatched) return;
     var factories = requireFn.m || {};
     var ids = Object.keys(factories);
     for (var i = 0; i < ids.length; i++) {
-      if (!looksLikeUpdateDialogFactory(factories[ids[i]])) continue;
+      var id = ids[i];
+      if (scannedUpdateFactoryIds[id]) continue;
+      scannedUpdateFactoryIds[id] = true;
+      if (!looksLikeUpdateDialogFactory(factories[id])) continue;
       try {
-        patchUpdateDialogExports(requireFn(ids[i]));
+        patchUpdateDialogExports(requireFn(id));
       } catch (err) {}
     }
+    if (updateDialogPatched) return;
     var cache = requireFn.c || {};
     var cacheIds = Object.keys(cache);
     for (var j = 0; j < cacheIds.length; j++) {
-      var entry = cache[cacheIds[j]];
+      var cacheId = cacheIds[j];
+      var cacheKey = 'c:' + cacheId;
+      if (scannedUpdateFactoryIds[cacheKey]) continue;
+      scannedUpdateFactoryIds[cacheKey] = true;
+      var entry = cache[cacheId];
       if (entry && entry.exports) patchUpdateDialogExports(entry.exports);
     }
   }
@@ -988,8 +1019,44 @@
     return wrapped;
   }
 
+  function armPushTrap(chunks) {
+    if (!chunks || chunks.__bhchat_push_trap) return true;
+    var current = chunks.push;
+    try {
+      Object.defineProperty(chunks, 'push', {
+        configurable: true,
+        enumerable: true,
+        get: function () {
+          return current;
+        },
+        set: function (next) {
+          if (typeof next !== 'function') {
+            current = next;
+            return;
+          }
+          if (next.__bhchat_wrapped) {
+            current = next;
+            return;
+          }
+          current = wrapPush(next.bind(chunks));
+        },
+      });
+    } catch (err) {
+      return false;
+    }
+    try {
+      chunks.__bhchat_push_trap = true;
+    } catch (err2) {}
+    if (typeof current === 'function' && !current.__bhchat_wrapped) {
+      chunks.push = current;
+    }
+    return true;
+  }
+
   function installPushHook() {
     var chunks = (self.webpackChunkheybox_chat = self.webpackChunkheybox_chat || []);
+    if (chunks.__bhchat_push_trap) return;
+    if (armPushTrap(chunks)) return;
     if (chunks.push && chunks.push.__bhchat_wrapped) return;
     chunks.push = wrapPush(chunks.push.bind(chunks));
   }
@@ -1032,8 +1099,16 @@
     processChunk(chunks[j]);
   }
 
-  // 3) 主包会覆盖 push — 持续重新 hook（懒加载 chunk 仍需要）
-  setInterval(installPushHook, 500);
+  // 3) 主包只会赋值一次 push。setter 接住这次覆盖；装不上时短轮询后停止。
+  if (!(self.webpackChunkheybox_chat && self.webpackChunkheybox_chat.__bhchat_push_trap)) {
+    var pushWatchTries = 0;
+    var pushWatchTimer = setInterval(function () {
+      pushWatchTries += 1;
+      installPushHook();
+      var hooked = self.webpackChunkheybox_chat && self.webpackChunkheybox_chat.__bhchat_push_trap;
+      if (hooked || pushWatchTries >= 30) clearInterval(pushWatchTimer);
+    }, 500);
+  }
 
   // 4) 主包就绪后通过 bootstrap chunk 直接 patch Q4
   function scheduleBootstrap() {
@@ -1076,7 +1151,53 @@
     }
   }
 
-  setInterval(mountSettingsFallback, 400);
+  function watchSettingsFallback() {
+    function stopIfMounted(observer) {
+      if (!document.querySelector('.betterheyboxchat-setting-block')) return;
+      observer.disconnect();
+    }
+    if (typeof MutationObserver !== 'function') {
+      var tries = 0;
+      var timer = setInterval(function () {
+        tries += 1;
+        mountSettingsFallback();
+        if (document.querySelector('.betterheyboxchat-setting-block') || tries >= 30) clearInterval(timer);
+      }, 500);
+      return;
+    }
+    var observer = new MutationObserver(function (records) {
+      var hit = false;
+      for (var i = 0; i < records.length && !hit; i++) {
+        var added = records[i].addedNodes;
+        for (var j = 0; j < added.length; j++) {
+          var node = added[j];
+          if (!node || node.nodeType !== 1) continue;
+          if (node.classList && node.classList.contains('cpt-layout-config-content')) {
+            hit = true;
+            break;
+          }
+          var settingsCls = typeof node.className === 'string' ? node.className : '';
+          if (
+            node.querySelector &&
+            (settingsCls.indexOf('cpt-') !== -1 || settingsCls.indexOf('config') !== -1) &&
+            node.querySelector('.cpt-layout-config-content')
+          ) {
+            hit = true;
+            break;
+          }
+        }
+      }
+      if (!hit) return;
+      mountSettingsFallback();
+      stopIfMounted(observer);
+    });
+    var root = document.body || document.documentElement;
+    if (root) observer.observe(root, { childList: true, subtree: true });
+    mountSettingsFallback();
+    stopIfMounted(observer);
+  }
+
+  watchSettingsFallback();
 
   function injectUpdateDialogStyles() {
     injectNativeStyles();
@@ -1267,32 +1388,61 @@
     if (window.__bhchat_official_update_closer__) return;
     window.__bhchat_official_update_closer__ = true;
 
-    function scan() {
+    var observer = null;
+    var stopTimer = null;
+    var stopped = false;
+
+    function stop() {
+      if (stopped) return;
+      stopped = true;
+      if (observer) observer.disconnect();
+      if (stopTimer) clearTimeout(stopTimer);
+    }
+
+    function scanNode(node) {
+      if (!node || node.nodeType !== 1) return false;
+      if (node.classList && node.classList.contains('cpt-update-dialog')) {
+        try { unlockOfficialUpdateDialogEl(node); } catch (err) {}
+        return true;
+      }
+      var cls = typeof node.className === 'string' ? node.className : '';
+      if (!cls) {
+        var child = node.firstElementChild;
+        if (!child || !child.classList || !child.classList.contains('cpt-update-dialog')) return false;
+        try { unlockOfficialUpdateDialogEl(child); } catch (err2) {}
+        return true;
+      }
+      if (cls.indexOf('dialog') === -1 && cls.indexOf('update') === -1 && cls.indexOf('cpt-') === -1) {
+        return false;
+      }
       try {
-        unlockOfficialUpdateDialogs(document);
-      } catch (err) {}
+        unlockOfficialUpdateDialogs(node);
+      } catch (err3) {}
+      return !!(node.querySelector && node.querySelector('.cpt-update-dialog'));
     }
 
     if (typeof MutationObserver === 'function') {
       var root = document.documentElement || document.body;
       if (root) {
-        var observer = new MutationObserver(function (records) {
+        observer = new MutationObserver(function (records) {
+          var unlocked = false;
           for (var i = 0; i < records.length; i++) {
             var added = records[i].addedNodes;
             for (var j = 0; j < added.length; j++) {
-              var node = added[j];
-              if (!node || node.nodeType !== 1) continue;
-              unlockOfficialUpdateDialogs(node);
+              if (scanNode(added[j])) unlocked = true;
             }
           }
+          if (unlocked) stop();
         });
         observer.observe(root, { childList: true, subtree: true });
       }
     }
 
-    scan();
-    setInterval(scan, 1000);
-    window.__bhchat_unlockOfficialUpdateDialog = scan;
+    if (scanNode(document.body) || scanNode(document.documentElement)) stop();
+    stopTimer = setTimeout(stop, 60000);
+    window.__bhchat_unlockOfficialUpdateDialog = function () {
+      scanNode(document.body);
+    };
   }
 
   installOfficialUpdateCloser();

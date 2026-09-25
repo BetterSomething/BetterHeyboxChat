@@ -92,8 +92,9 @@ function hasUpdate(local, remote) {
     }
     return false;
   }
-  var localSha = (local && (local.version || local.commit)) || '';
-  return !shaEqual(localSha, remote.version || remote.commit);
+  var localSha = (local && local.commit) || (local && local.version) || '';
+  var remoteSha = (remote && remote.commit) || remote.version || '';
+  return !shaEqual(localSha, remoteSha);
 }
 
 function isIgnored(ignored, remote) {
@@ -404,6 +405,17 @@ function fetchManifest(opts) {
     });
 }
 
+function assertInstallerSha256(manifest, buf) {
+  if (!manifest || !manifest.sha256) {
+    throw new Error('安装包缺少 sha256');
+  }
+  var actual = sha256Buffer(buf);
+  if (actual !== manifest.sha256) {
+    throw new Error('安装包校验失败');
+  }
+  return actual;
+}
+
 function sha256Buffer(buf) {
   return require('crypto').createHash('sha256').update(buf).digest('hex');
 }
@@ -432,10 +444,7 @@ function downloadInstaller(opts) {
     agent: agent,
   };
   function writeBuf(buf) {
-    var actual = sha256Buffer(buf);
-    if (manifest.sha256 && actual !== manifest.sha256) {
-      throw new Error('安装包校验失败');
-    }
+    assertInstallerSha256(manifest, buf);
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(dest, buf);
     return dest;
@@ -472,14 +481,23 @@ function cleanupOldInstallers(keepName) {
   } catch (err) {}
 }
 
+function quoteCmd(value) {
+  return '"' + String(value).replace(/"/g, '""') + '"';
+}
+
 function launchInstaller(exePath, installRoot) {
   var spawn = require('child_process').spawn;
   var args = ['--reinstall', '--yes'];
   if (installRoot) args.push('--path', String(installRoot));
-  var child = spawn(String(exePath), args, {
+  // cmd start 把安装器脱离黑盒语音进程树。已发布的安装器会 taskkill /T，
+  // 直接 spawn 的话安装器会被自己拉起的 taskkill 一起杀掉。
+  // 整段命令原样交给 cmd。再包一层引号时，start 会解析失败，cmd 挂住，安装器不会出现。
+  var command = 'start "" ' + [quoteCmd(exePath)].concat(args.map(quoteCmd)).join(' ');
+  var child = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/c', command], {
     detached: true,
     stdio: 'ignore',
-    windowsHide: false,
+    windowsHide: true,
+    windowsVerbatimArguments: true,
   });
   child.unref();
   return { ok: true };
@@ -502,4 +520,5 @@ module.exports = {
   cleanupOldInstallers: cleanupOldInstallers,
   launchInstaller: launchInstaller,
   sha256Buffer: sha256Buffer,
+  assertInstallerSha256: assertInstallerSha256,
 };

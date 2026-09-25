@@ -9,6 +9,7 @@ import {
   renderVersionJs,
   renderVersionJson,
   resolveBuild,
+  stripV,
 } from './lib/versioning.mjs';
 
 export function git(args, cwd) {
@@ -26,9 +27,13 @@ export function git(args, cwd) {
 export function collectGitFacts(cwd, env = process.env) {
   const pointsAt = git(['tag', '--points-at', 'HEAD'], cwd);
   const tags = pointsAt ? pointsAt.split(/\r?\n/) : [];
+  const listed = git(['tag', '--list', 'v*'], cwd);
+  const releaseTags = listed ? listed.split(/\r?\n/) : [];
+  const releaseTag = pickReleaseTag(releaseTags);
   return {
     bhcVersion: env.BHC_VERSION || '',
     exactTag: pickReleaseTag(tags),
+    releaseVersion: releaseTag ? stripV(releaseTag) : '',
     shortSha: git(['rev-parse', '--short', 'HEAD'], cwd),
   };
 }
@@ -39,7 +44,10 @@ export function writeVersionFiles(root, build) {
   fs.mkdirSync(path.dirname(versionJs), { recursive: true });
   fs.writeFileSync(versionJs, renderVersionJs(build));
   fs.writeFileSync(versionJson, renderVersionJson(build));
-  return { versionJs, versionJson, artifact: installerArtifactName(build.version) };
+  const artifactId = build.channel === 'dev' && build.commit && build.commit !== 'unknown' && build.commit !== build.version
+    ? build.commit
+    : build.version;
+  return { versionJs, versionJson, artifact: installerArtifactName(artifactId) };
 }
 
 function isMain() {

@@ -11,16 +11,16 @@
 
 | 属性 | 类型 | 说明 |
 | --- | --- | --- |
-| `BHChat.version` | `string` | 框架版本。正式版为 `0.1.0` 这种 semver，开发版为短 SHA（如 `c357f16`） |
+| `BHChat.version` | `string` | 框架版本，正式版和开发版都是 `1.1.0` 这种 semver。开发版的提交号在 `BHChat.commit`，不拿来当版本号 |
 | `BHChat.channel` | `'release' \| 'dev'` | 构建通道 |
 | `BHChat.commit` | `string` | 构建时的 git 短 SHA |
 | `BHChat.clientVersion` | `string` | `window.asar_version`，未知时为 `'unknown'` |
-| `BHChat.indicator.isVisible()` | `boolean` | 右下角角标是否显示（正式版 `BHC v0.1.0`，开发版 `BHC c357f16`） |
+| `BHChat.indicator.isVisible()` | `boolean` | 右下角角标是否显示（`BHC v1.1.0`） |
 | `BHChat.indicator.setVisible(on)` | `Promise<{visible}>` | 显示/隐藏角标，写入 `bhchat.indicator.visible` |
 
 ### `BHChat.update`
 
-框架本体检查更新。设置里可选跟踪「开发版」或「正式版」（默认跟随本机 `BHChat.channel`）。正式版比 Latest semver，开发版比 `dev` 短 SHA。清单和安装包走插件市场加速源 + GitHub `releases/download`，不代打 `api.github.com`。
+框架本体检查更新。设置里可选跟踪「开发版」或「正式版」（默认跟随本机 `BHChat.channel`）。正式版比 Latest semver，开发版比 `commit`。清单和安装包走插件市场加速源 + GitHub `releases/download`。镜像优先；镜像失败或清单不合法时再问 `api.github.com`。没有 sha256 不会安装。
 
 | 方法 | 说明 |
 | --- | --- |
