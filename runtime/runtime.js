@@ -751,8 +751,12 @@
       }
       if (!window.__bhchat_require__) return false;
       try {
-        var map = window.__bhchat_module_map__ || {};
-        var busMod = window.__bhchat_require__(map.EVENT_BUS || '30570');
+        var busId =
+          typeof window.__bhchat_resolve_id__ === 'function'
+            ? window.__bhchat_resolve_id__('EVENT_BUS')
+            : '';
+        if (!busId) return false;
+        var busMod = window.__bhchat_require__(busId);
         var bus = busMod.A || busMod.default || busMod;
         if (bus && bus.$dynamic) {
           bus.$dynamic('UserConfig', blockKey);

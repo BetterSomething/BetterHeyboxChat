@@ -251,8 +251,11 @@
   function getOfficialBus() {
     var req = window.__bhchat_require__;
     if (typeof req !== 'function') return null;
-    var map = window.__bhchat_module_map__ || {};
-    var id = map.EVENT_BUS || '30570';
+    var id =
+      typeof window.__bhchat_resolve_id__ === 'function'
+        ? window.__bhchat_resolve_id__('EVENT_BUS')
+        : '';
+    if (!id) return null;
     try {
       var mod = req(id);
       var bus = mod && (mod.A || mod.default || mod);

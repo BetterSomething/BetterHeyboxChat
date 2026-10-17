@@ -66,7 +66,17 @@ flowchart TB
 | `main-bridge.js` | F12 / Ctrl+Shift+I；禁止 Proxy 替换 `BrowserWindow` |
 | `preload-bridge.js` | DevTools 开关；**禁止**改 `ELECTRON_ENV` |
 
-模块 ID（1.56.0 / 1.57.0 / 1.57.1 **当前**相同，换版本可能变）对插件隐藏，只在 hook 内部使用：`42416` 设置菜单、`93509` UserConfig、`30570` EventBus、`16886` Vuex。插件走 `BHChat` 稳定面；必须碰官方模块时运行时探测，不要写「仅某某版本」。
+官方模块的**数字 ID 会随版本变**（例：设置页组件在 1.58.0 及以前是 `93509`，1.59.0 起变成 `53971`），所以 hook 不把 ID 当入口，而是按工厂源码里的稳定标记探测：
+
+| 模块 | 标记（须全中） |
+| --- | --- |
+| 设置菜单数组 | `about_heychat` + `feedback_history` + `InviteSetting` + `AboutHeychat` |
+| 设置页组件 | `config-content-wrapper` + `switchToBlock` + `prevent-hide-user-card` + `cpt-layout-config-content` |
+| 强制更新弹窗 | `cpt-update-dialog` + `setUpdateConfig` |
+| EventBus | `$dynamic` + `$jump` + `show-dynamic-dialog` + `timing_collector` |
+| Vuex store | `cur_private_user` + `reply_list_params` + `feedback_reply_params` + `timing_msg_list` |
+
+这些标记在支持范围 `1.56.0~1.60.0` 内各自**唯一**命中。命中后把实际 ID 记进 `window.__bhchat_module_map__`；运行时要按 ID 取模块时用 `window.__bhchat_resolve_id__(kind)`，它会在未命中时重扫一遍并返回空串让调用方降级。这个映射对插件隐藏；插件走 `BHChat` 稳定面，必须碰官方模块时运行时探测导出，不要写死数字 ID。
 
 ### 3. Preload Bridge
 
@@ -111,7 +121,7 @@ window.BHChat = {
 ## Webpack Hook（已实现要点）
 
 - 必须在 webpack 主包之前同步加载；主包会覆盖 `push`，因此定时 re-hook
-- 禁止在工厂未就绪时 `__webpack_require__(93509)`（会污染缓存，设置弹窗永久打不开）
+- 禁止在工厂未就绪时 `__webpack_require__(id)`（会污染缓存，设置弹窗永久打不开）；本 hook 只在自己探测到标记、确认导出可用后才 require
 - 设置组件必须用 `render(h)`：官方 Vue 是 runtime-only
 - 插件设置通过 `registerPanel({ id, title, component })` 挂载（`id` 须等于插件 id）；设置页从已安装插件列表钻取打开，不要改 hook 源码
 
@@ -123,7 +133,7 @@ window.BHChat = {
 | Phase 2 BHChat API、Vuex watch、插件启停、开发文档 | 已完成 |
 | Phase 2 热更新后 patch 完整性校验 | 已落地（main-bridge `ensurePatches` + `BHChat.onClientUpdate`） |
 | Phase 3 在线货架（独立插件仓 `registry.json`） | 已落地（只拉清单，按需下载；市场可改读本地仓） |
-| Phase 3 社区模板、多版本映射 | 1.56 / 1.57.x 暂共用同一套 ID，未做映射表；兼容约定见 [09-plugin-dev.md](./09-plugin-dev.md)「版本兼容」 |
+| Phase 3 社区模板、多版本映射 | 已改为特征探测，不再维护 ID 映射表；兼容约定见 [09-plugin-dev.md](./09-plugin-dev.md)「版本兼容」 |
 
 ## 关键 Patch 点（1.56.0 / 1.57.0 / 1.57.1，路径相同）
 

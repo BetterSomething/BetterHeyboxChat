@@ -1,6 +1,13 @@
 /**
- * BetterHeyboxChat Webpack Hook（1.56.0 / 1.57.0 / 1.57.1）
+ * BetterHeyboxChat Webpack Hook
  * 必须在 webpack 主包之前同步加载；并处理主包覆盖 push 的情况。
+ *
+ * 官方模块 ID 是内部实现，换版本会变（例：设置页组件 1.58.0 及以前的 93509 在 1.59.0
+ * 换成了 53971），所以这里**不把数字 ID 当入口**：按工厂源码里的稳定标记逐个探测。
+ * - 设置页组件：config-content-wrapper + switchToBlock + prevent-hide-user-card + cpt-layout-config-content
+ * - 设置菜单项数组：about_heychat + feedback_history + InviteSetting + AboutHeychat
+ * - 强制更新弹窗：cpt-update-dialog + setUpdateConfig
+ * 上述标记在 1.56.0~1.60.0 上各自唯一命中。
  */
 (function () {
   'use strict';
@@ -11,11 +18,33 @@
   var MENU_LABEL = 'BetterHeyboxChat';
   var COMPONENT_NAME = 'BetterHeyboxChatSetting';
 
+  // 探测标记：命中即认，不看 ID。
+  var USER_CONFIG_MARKERS = [
+    'config-content-wrapper',
+    'switchToBlock',
+    'prevent-hide-user-card',
+    'cpt-layout-config-content',
+  ];
+  var SETTINGS_BLOCKS_MARKERS = [
+    'about_heychat',
+    'feedback_history',
+    'InviteSetting',
+    'AboutHeychat',
+  ];
+  var EVENT_BUS_MARKERS = ['$dynamic', '$jump', 'show-dynamic-dialog', 'timing_collector'];
+  var VUEX_STORE_MARKERS = [
+    'cur_private_user',
+    'reply_list_params',
+    'feedback_reply_params',
+    'timing_msg_list',
+  ];
+
+  // 起始为空：全部靠特征探测填。探测不到时运行时的调用点各自有兜底，不会因此不可用。
   var MODULE_MAP = {
-    SETTINGS_BLOCKS: '42416',
-    USER_CONFIG: '93509',
-    EVENT_BUS: '30570',
-    VUEX_STORE: '16886',
+    SETTINGS_BLOCKS: '',
+    USER_CONFIG: '',
+    EVENT_BUS: '',
+    VUEX_STORE: '',
   };
 
   window.__bhchat_module_map__ = MODULE_MAP;
@@ -811,40 +840,118 @@
     return true;
   }
 
-  function moduleFactoryReady(requireFn, id) {
-    if (!requireFn || !requireFn.m) return false;
-    return typeof requireFn.m[id] === 'function' || typeof requireFn.m[String(id)] === 'function';
+  function factorySource(factory) {
+    try {
+      return Function.prototype.toString.call(factory);
+    } catch (err) {
+      return '';
+    }
+  }
+
+  function hasAllMarkers(src, markers) {
+    if (!src) return false;
+    for (var i = 0; i < markers.length; i++) {
+      if (src.indexOf(markers[i]) === -1) return false;
+    }
+    return true;
+  }
+
+  function looksLikeSettingsBlocksFactory(factory) {
+    if (typeof factory !== 'function') return false;
+    return hasAllMarkers(factorySource(factory), SETTINGS_BLOCKS_MARKERS);
+  }
+
+  function looksLikeUserConfigFactory(factory) {
+    if (typeof factory !== 'function') return false;
+    return hasAllMarkers(factorySource(factory), USER_CONFIG_MARKERS);
+  }
+
+  function looksLikeEventBusFactory(factory) {
+    if (typeof factory !== 'function') return false;
+    return hasAllMarkers(factorySource(factory), EVENT_BUS_MARKERS);
+  }
+
+  function looksLikeVuexStoreFactory(factory) {
+    if (typeof factory !== 'function') return false;
+    return hasAllMarkers(factorySource(factory), VUEX_STORE_MARKERS);
+  }
+
+  /**
+   * 按标记扫遍已注册工厂，返回命中的模块 ID 列表；顺便记录进 MODULE_MAP。
+   * 工厂源码里的标记是稳定的，ID 不是，所以这里以源码为准。
+   */
+  function findFactoryIds(requireFn, matcher, mapKey) {
+    var found = [];
+    if (!requireFn || !requireFn.m) return found;
+    var ids = Object.keys(requireFn.m);
+    for (var i = 0; i < ids.length; i++) {
+      if (!matcher(requireFn.m[ids[i]])) continue;
+      found.push(ids[i]);
+      if (mapKey && !MODULE_MAP[mapKey]) MODULE_MAP[mapKey] = ids[i];
+    }
+    return found;
   }
 
   function applyKnownPatches(requireFn) {
     if (!requireFn) return;
+
+    var blocksIds = findFactoryIds(requireFn, looksLikeSettingsBlocksFactory, 'SETTINGS_BLOCKS');
     try {
-      var mod = requireFn(MODULE_MAP.SETTINGS_BLOCKS);
-      if (mod && mod.Q4) patchSettingsBlocks(mod.Q4);
+      for (var i = 0; i < blocksIds.length; i++) {
+        var blocksMod = null;
+        try {
+          blocksMod = requireFn(blocksIds[i]) || null;
+        } catch (err) {
+          continue;
+        }
+        if (blocksMod && Array.isArray(blocksMod.Q4) && patchSettingsBlocks(blocksMod.Q4)) break;
+      }
     } catch (err) {
-      console.warn('[BetterHeyboxChat] bootstrap Q4 patch failed:', err);
+      console.warn('[BetterHeyboxChat] bootstrap settings menu patch failed:', err);
     }
+
+    var userConfigIds = findFactoryIds(requireFn, looksLikeUserConfigFactory, 'USER_CONFIG');
     try {
-      if (moduleFactoryReady(requireFn, MODULE_MAP.USER_CONFIG)) {
-        var userMod = requireFn(MODULE_MAP.USER_CONFIG);
-        if (userMod) patchUserConfig(userMod);
+      for (var j = 0; j < userConfigIds.length; j++) {
+        var userMod = null;
+        try {
+          userMod = requireFn(userConfigIds[j]) || null;
+        } catch (err) {
+          continue;
+        }
+        if (userMod && patchUserConfig(userMod)) break;
       }
     } catch (err) {
       console.warn('[BetterHeyboxChat] bootstrap UserConfig patch failed:', err);
     }
+
     try {
       patchLoadedUpdateDialog(requireFn);
     } catch (err) {
       console.warn('[BetterHeyboxChat] bootstrap UpdateDialog patch failed:', err);
     }
+
+    // EventBus / Vuex store：只记录探测到的 ID，不在这里 require。
+    // 它们的调用点（runtime.js / session-restore.js）会自己按 ID 取模块并做 typeof 守卫，
+    // 这样即使探测失败也不会在启动阶段把模块提前执行掉。
+    try {
+      findFactoryIds(requireFn, looksLikeEventBusFactory, 'EVENT_BUS');
+      findFactoryIds(requireFn, looksLikeVuexStoreFactory, 'VUEX_STORE');
+    } catch (err) {
+      console.warn('[BetterHeyboxChat] bootstrap bus/store probe failed:', err);
+    }
   }
 
-  function onModuleLoaded(id, exports) {
-    if (id === MODULE_MAP.SETTINGS_BLOCKS) {
-      var blocks = exports.Q4;
-      if (blocks) return patchSettingsBlocks(blocks);
+  /** kind 由 processChunk 在包装时算好，避免每次执行都重新读源码。 */
+  function patchLoadedFactory(id, kind, exports) {
+    if (kind === 'blocks') {
+      MODULE_MAP.SETTINGS_BLOCKS = String(id);
+      var blocks = exports && exports.Q4;
+      if (Array.isArray(blocks)) return patchSettingsBlocks(blocks);
+      return false;
     }
-    if (id === MODULE_MAP.USER_CONFIG) {
+    if (kind === 'userconfig') {
+      MODULE_MAP.USER_CONFIG = String(id);
       return patchUserConfig(exports);
     }
     return false;
@@ -901,7 +1008,7 @@
 
   function looksLikeUpdateDialogFactory(factory) {
     if (typeof factory !== 'function' || factory.__bhchat_wrapped) return false;
-    var src = Function.prototype.toString.call(factory);
+    var src = factorySource(factory);
     return src.indexOf('cpt-update-dialog') !== -1 && src.indexOf('setUpdateConfig') !== -1;
   }
 
@@ -945,12 +1052,12 @@
     }
   }
 
-  function wrapFactory(id, factory) {
+  function wrapFactory(id, factory, kind) {
     return function (module, exports, require) {
       if (!window.__bhchat_require__) window.__bhchat_require__ = require;
       factory(module, exports, require);
       try {
-        onModuleLoaded(String(id), exports);
+        if (kind) patchLoadedFactory(String(id), kind, exports);
         patchUpdateDialogExports(exports);
       } catch (err) {
         console.error('[BetterHeyboxChat] module patch failed:', id, err);
@@ -958,22 +1065,27 @@
     };
   }
 
-  function wrapChunkModule(modules, id) {
-    if (!modules[id] || modules[id].__bhchat_wrapped) return;
-    modules[id] = wrapFactory(id, modules[id]);
-    modules[id].__bhchat_wrapped = true;
+  /** 工厂源码算一次，判定它属于哪一类；命中类别的才包装。 */
+  function classifyFactory(factory) {
+    if (typeof factory !== 'function' || factory.__bhchat_wrapped) return '';
+    var src = factorySource(factory);
+    if (hasAllMarkers(src, SETTINGS_BLOCKS_MARKERS)) return 'blocks';
+    if (hasAllMarkers(src, USER_CONFIG_MARKERS)) return 'userconfig';
+    if (src.indexOf('cpt-update-dialog') !== -1 && src.indexOf('setUpdateConfig') !== -1) {
+      return 'updatedialog';
+    }
+    return '';
   }
 
   function processChunk(chunk) {
     if (!chunk || !chunk[1]) return;
     var modules = chunk[1];
-    wrapChunkModule(modules, MODULE_MAP.SETTINGS_BLOCKS);
-    wrapChunkModule(modules, MODULE_MAP.USER_CONFIG);
     var keys = Object.keys(modules);
     for (var i = 0; i < keys.length; i++) {
-      if (looksLikeUpdateDialogFactory(modules[keys[i]])) {
-        wrapChunkModule(modules, keys[i]);
-      }
+      var kind = classifyFactory(modules[keys[i]]);
+      if (!kind) continue;
+      modules[keys[i]] = wrapFactory(keys[i], modules[keys[i]], kind);
+      modules[keys[i]].__bhchat_wrapped = true;
     }
   }
 
@@ -1022,6 +1134,25 @@
   }
 
   window.__bhchat_bootstrap_patch__ = bootstrapPatch;
+
+  /**
+   * 供运行时按需取「探测到的官方模块 ID」，取不到返回空串，由调用方降级。
+   * 这样调用点不必写死数字 ID；探测失败时还会重新扫一遍（每秒最多一次）。
+   */
+  var lastResolveProbeAt = 0;
+  window.__bhchat_resolve_id__ = function (kind) {
+    if (MODULE_MAP[kind]) return MODULE_MAP[kind];
+    var now = Date.now();
+    if (now - lastResolveProbeAt > 1000) {
+      lastResolveProbeAt = now;
+      if (window.__bhchat_require__) {
+        applyKnownPatches(window.__bhchat_require__);
+      } else {
+        bootstrapPatch();
+      }
+    }
+    return MODULE_MAP[kind] || '';
+  };
 
   // 1) 抢先 hook push
   installPushHook();

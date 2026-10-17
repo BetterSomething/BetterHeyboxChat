@@ -370,4 +370,4 @@ BHChat.heyboxDevMcp.stop()
 - 事件 handler、`onReady` 回调内的异常只打日志
 - `watch` / `mapState` 在 store 未就绪时降级，不要假设启动瞬间一定有房间数据
 - 设置组件必须 `render(h)`；`template` 会渲染成空白
-- webpack 模块 ID 是内部实现：1.56.0 / 1.57.0 / 1.57.1 当前相同，但换版本可能变。插件不要写死数字 ID；必须用时先探测导出（如 `typeof api.DC === 'function'`），没有就降级
+- webpack 模块 ID 是内部实现，换版本会变（例：设置页组件 1.58.0 及以前是 `93509`，1.59.0 起是 `53971`）。插件不要写死数字 ID，框架自身也不写死；必须用时先探测导出（如 `typeof api.DC === 'function'`），没有就降级
