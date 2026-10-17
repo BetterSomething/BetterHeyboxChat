@@ -200,7 +200,7 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 
 ### `BHChat.perf`
 
-通用性能面，不含业务策略。配置在数据根 `perf-tune.json`。启动开关必须在 Chromium 起来之前加上，改完可能要重启。1.56.0 / 1.57.0 / 1.57.1 都先探测再调用。
+通用性能面，不含业务策略。配置在数据根 `perf-tune.json`。启动时只加磁盘缓存上限，必须在 Chromium 起来之前加上，改完可能要重启。支持范围内的客户端都先探测再调用。
 
 | 方法 | 说明 |
 | --- | --- |
@@ -208,10 +208,10 @@ handler 抛错会被捕获并打日志，不中断其他监听者。
 | `setConfig({ enabled, mode })` | `mode` 为 `'A'` / `'B'` / `'C'`。返回 `{ config, needsRestart }` |
 | `getWindowState()` | `{ visible, minimized, focused, ok }`。读失败时 `ok=false` |
 | `lightReclaim()` | 清 WebKit 缓存、尽量 `gc()`、清 session HTTP 缓存。不关功能 |
-| `trimWorkingSet()` | 对本应用子进程 `EmptyWorkingSet`。一分钟最多一次；失败不抛 |
+| `trimWorkingSet()` | 对本应用主进程和渲染进程 `EmptyWorkingSet`，不碰 GPU / Utility 进程。5 分钟最多一次；失败不抛 |
 | `getMemory()` | 本应用全部子进程工作集之和（KB）。`{ ok, workingSetKb, processes }` |
 
-不要在语音 / 共享中调用 `trimWorkingSet`。窗口是否该压由插件判断。不关硬件加速，不加 `--single-process`。
+不要在语音 / 共享中调用 `trimWorkingSet`。窗口是否该压由插件判断。不关硬件加速，不加 `--single-process` / `--in-process-gpu`。
 
 ### `BHChat.plugins`
 

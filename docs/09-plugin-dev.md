@@ -228,9 +228,10 @@ BHChat.openPanel('marketplace'); // 打开设置并跳转插件市场
 
 官方货架 `perf-tune`：
 
-- 默认档 A：只在托盘闲置且不在语音/共享时归还工作集；仍加 `aggressive-cache-discard` 和 64MB 磁盘缓存
-- 高级档：进阶（可见闲置也压）、激进（2 分钟闲置 + `--in-process-gpu`）。不关硬件加速 / 覆盖层 / AI 降噪
-- 策略在插件；特权走 `BHChat.perf`。官方 `setLimit` 运行时探测，不写死 webpack 数字 ID
+- 默认档 A：只在托盘闲置且不在语音/共享时归还工作集；只加 64MB 磁盘缓存
+- 高级档：进阶（可见闲置也压）、激进（2 分钟闲置、32MB 磁盘缓存）。不关硬件加速 / 覆盖层 / AI 降噪，不加 `--in-process-gpu`
+- 同一段闲置只归还一次工作集，轻回收只在进后台时做；官方缓存 `setLimit` 按工厂源码探测
+- 策略在插件；特权走 `BHChat.perf`
 - 右下角角标旁显示本应用工作集当前 / 本次最高 / 最低（`BHChat.perf.getMemory`）
 
 官方货架 `block-update`：

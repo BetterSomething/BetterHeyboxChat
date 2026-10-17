@@ -10,7 +10,7 @@ var { spawn } = require('child_process');
 
 var CONFIG_NAME = 'perf-tune.json';
 var PLUGIN_ID = 'perf-tune';
-var TRIM_INTERVAL_MS = 60 * 1000;
+var TRIM_INTERVAL_MS = 5 * 60 * 1000;
 var DISK_CACHE_A = 64 * 1024 * 1024;
 var DISK_CACHE_C = 32 * 1024 * 1024;
 var PROCESS_SET_QUOTA = 0x0100;
@@ -37,7 +37,6 @@ function normalizeConfig(raw) {
     enabled: raw.enabled !== false,
     mode: mode,
     diskCacheBytes: diskCacheBytesFor(mode),
-    inProcessGpu: mode === 'C',
   };
 }
 
@@ -46,17 +45,12 @@ function snapshotOf(config) {
   return {
     enabled: !!config.enabled,
     diskCacheBytes: config.diskCacheBytes,
-    inProcessGpu: !!config.inProcessGpu,
   };
 }
 
 function sameSnapshot(a, b) {
   if (!a || !b) return false;
-  return (
-    !!a.enabled === !!b.enabled &&
-    Number(a.diskCacheBytes) === Number(b.diskCacheBytes) &&
-    !!a.inProcessGpu === !!b.inProcessGpu
-  );
+  return !!a.enabled === !!b.enabled && Number(a.diskCacheBytes) === Number(b.diskCacheBytes);
 }
 
 function configPath() {
@@ -127,11 +121,8 @@ function applyCommandLine(app, config) {
   }
   if (!config.enabled) return { applied: false, reason: 'disabled' };
   try {
-    app.commandLine.appendSwitch('aggressive-cache-discard');
+    // 不要加 in-process-gpu 之类改进程模型的开关（GPU 进主进程后任何 GPU 故障都会让整个客户端退出）
     app.commandLine.appendSwitch('disk-cache-size', String(config.diskCacheBytes));
-    if (config.inProcessGpu) {
-      app.commandLine.appendSwitch('in-process-gpu');
-    }
     return { applied: true };
   } catch (err) {
     return { applied: false, reason: String(err && err.message ? err.message : err) };
@@ -161,15 +152,26 @@ function windowStateFrom(win) {
 
 function collectAppPids(mod, sender) {
   var pids = {};
+  var excluded = {};
   function add(id) {
     id = Number(id);
     if (id > 0) pids[id] = true;
+  }
+  function exclude(id) {
+    id = Number(id);
+    if (id > 0) excluded[id] = true;
   }
   add(process.pid);
   try {
     if (mod && mod.app && typeof mod.app.getAppMetrics === 'function') {
       (mod.app.getAppMetrics() || []).forEach(function (item) {
-        if (item && item.pid) add(item.pid);
+        if (!item || !item.pid) return;
+        var type = item.type;
+        if (type === 'GPU' || type === 'Utility') {
+          exclude(item.pid);
+          return;
+        }
+        if (type === 'Browser' || type === 'Tab') add(item.pid);
       });
     }
   } catch (err) {}
@@ -186,9 +188,13 @@ function collectAppPids(mod, sender) {
       });
     }
   } catch (err) {}
-  return Object.keys(pids).map(function (id) {
-    return Number(id);
-  });
+  return Object.keys(pids)
+    .map(function (id) {
+      return Number(id);
+    })
+    .filter(function (id) {
+      return !excluded[id];
+    });
 }
 
 function findShell() {
