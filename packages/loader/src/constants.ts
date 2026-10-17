@@ -59,7 +59,39 @@ try { require('./betterheyboxchat/main-bridge.js'); } catch (e) { console.error(
 ${MARKER_END}
 `.trim();
 
-export const SUPPORTED_CLIENT_VERSIONS = ['1.56.0', '1.57.0', '1.57.1'];
+/** 黑盒客户端支持范围（含两端）。文档和报错都用这一串，不要再逐个列版本。 */
+export const SUPPORTED_CLIENT_RANGE = '1.56.0~1.60.0';
+
+function parseClientVersion(version: string): number[] | null {
+  const text = String(version || '').trim();
+  if (!text) return null;
+  const parts = text.split('.');
+  const nums: number[] = [];
+  for (const part of parts) {
+    if (!/^\d+$/.test(part)) return null;
+    nums.push(Number(part));
+  }
+  return nums.length ? nums : null;
+}
+
+function compareClientVersionParts(left: number[], right: number[]): number {
+  const len = Math.max(left.length, right.length);
+  for (let i = 0; i < len; i += 1) {
+    const a = left[i] ?? 0;
+    const b = right[i] ?? 0;
+    if (a !== b) return a > b ? 1 : -1;
+  }
+  return 0;
+}
+
+export function isSupportedClientVersion(version: string): boolean {
+  const [minText, maxText] = SUPPORTED_CLIENT_RANGE.split('~');
+  const current = parseClientVersion(version);
+  const min = parseClientVersion(minText || '');
+  const max = parseClientVersion(maxText || '');
+  if (!current || !min || !max) return false;
+  return compareClientVersionParts(current, min) >= 0 && compareClientVersionParts(current, max) <= 0;
+}
 
 export const PROGRAM_FILES_FOLDERS = ['Program Files', 'Program Files (x86)'];
 

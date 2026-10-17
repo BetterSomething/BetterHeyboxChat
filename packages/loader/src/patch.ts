@@ -7,7 +7,8 @@ import {
   LOADER_VERSION,
   MARKER_BEGIN,
   PRELOAD_SNIPPET,
-  SUPPORTED_CLIENT_VERSIONS,
+  SUPPORTED_CLIENT_RANGE,
+  isSupportedClientVersion,
 } from './constants.js';
 import { getRuntimeSourceDir } from './detect.js';
 import type { ClientInstall, InstallManifest, PatchState } from './types.js';
@@ -49,9 +50,9 @@ export function readPatchState(appDir: string): PatchState {
 }
 
 export function assertClientSupported(version: string): void {
-  if (!SUPPORTED_CLIENT_VERSIONS.includes(version)) {
+  if (!isSupportedClientVersion(version)) {
     throw new Error(
-      `客户端版本 ${version} 暂未纳入兼容表。当前支持: ${SUPPORTED_CLIENT_VERSIONS.join(', ')}`,
+      `客户端版本 ${version} 不在支持范围内。支持范围：${SUPPORTED_CLIENT_RANGE}`,
     );
   }
 }

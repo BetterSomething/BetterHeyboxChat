@@ -2,7 +2,8 @@ use crate::client::{restart_heybox_if_was_running, stop_if_running};
 use crate::userdata;
 use crate::constants::{
     BACKUP_DIR, HTML_MARKER, HTML_SNIPPET, INDEX_SNIPPET, LOADER_VERSION, MANIFEST_FILE,
-    MARKER_BEGIN, MARKER_END, PRELOAD_SNIPPET, SUPPORTED_CLIENT_VERSIONS,
+    MARKER_BEGIN, MARKER_END, PRELOAD_SNIPPET, SUPPORTED_CLIENT_RANGE,
+    is_supported_client_version,
 };
 use crate::path_util::normalize_path;
 use crate::types::{ClientInstall, InstallManifest, PatchState};
@@ -51,12 +52,11 @@ pub fn read_patch_state(app_dir: &Path) -> PatchState {
 }
 
 pub fn assert_client_supported(version: &str) -> Result<(), String> {
-    if SUPPORTED_CLIENT_VERSIONS.contains(&version) {
+    if is_supported_client_version(version) {
         Ok(())
     } else {
         Err(format!(
-            "客户端版本 {version} 暂未纳入兼容表。当前支持: {}",
-            SUPPORTED_CLIENT_VERSIONS.join(", ")
+            "客户端版本 {version} 不在支持范围内。支持范围：{SUPPORTED_CLIENT_RANGE}"
         ))
     }
 }

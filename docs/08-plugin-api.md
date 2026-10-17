@@ -2,10 +2,10 @@
 
 > 全局对象：`window.BHChat`  
 > 实现：`runtime/runtime.js`  
-> 兼容客户端：Heybox Chat **1.56.0 / 1.57.0 / 1.57.1**（与安装器 / loader 的 `SUPPORTED_CLIENT_VERSIONS` 对齐）  
+> 兼容客户端：Heybox Chat **1.56.0~1.60.0**（与安装器 / loader 的 `SUPPORTED_CLIENT_RANGE` 对齐）  
 > 写法示例见 [09-plugin-dev.md](./09-plugin-dev.md)
 
-插件只应依赖本页列出的稳定面。`window.__bhchat_require__`、`window.__bhchat_module_map__` 是内部实现，换版本可能失效。同一份插件必须能在兼容表里的**所有**客户端上加载；某一版本没有的 API 要探测后降级，不要写成「仅某某版本」。
+插件只应依赖本页列出的稳定面。`window.__bhchat_require__`、`window.__bhchat_module_map__` 是内部实现，换版本可能失效。同一份插件必须能在支持范围 **1.56.0~1.60.0** 内的客户端上加载；某一版本没有的 API 要探测后降级，不要写成「仅某某版本」。
 
 ## 元数据
 
@@ -333,7 +333,7 @@ BHChat.blockUpdate.getStatus()
 BHChat.blockUpdate.ensurePatch()
 ```
 
-`official-room-deco` 启用后挂载（1.56.0 / 1.57.0 / 1.57.1；走官方 `uploadCustomFile` + `POST /chatroom/v2/room/decorate`，忽略客户端 `can_change_bg_pic`）：
+`official-room-deco` 启用后挂载（支持范围内的客户端；走官方 `uploadCustomFile` + `POST /chatroom/v2/room/decorate`，忽略客户端 `can_change_bg_pic`）：
 
 ```javascript
 BHChat.officialRoomDeco.snapshot()
@@ -341,6 +341,8 @@ BHChat.officialRoomDeco.upload(file)
 BHChat.officialRoomDeco.decorate(patch?)
 BHChat.officialRoomDeco.applying()
 ```
+
+`applying()` 在 1.58.0 及更早走官方 `lI`（`GET /chatroom/v2/room/decorate/applying`）；1.59.0 起官方把该导出和接口都删了，此时不 reject，而是返回房间状态里的 `bg_pic` 近似值并带 `degraded: true` 与 `reason`，调用方据此判断数据来源。
 
 `export-credentials` 启用后挂载（从当前登录态收集官方 API query / Cookie，**不要**把结果写入仓库）：
 

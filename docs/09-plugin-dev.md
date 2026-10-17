@@ -7,7 +7,7 @@
 
 | 项   | 值                                                      |
 | --- | ------------------------------------------------------ |
-| 客户端 | 黑盒语音 **1.56.0 / 1.57.0 / 1.57.1**（须同时兼容，见下方「版本兼容」） |
+| 客户端 | 黑盒语音 **1.56.0~1.60.0**（须同时兼容，见下方「版本兼容」） |
 | 前端  | Vue **2.7 runtime-only** + Vuex + Webpack              |
 | 注入点 | 渲染进程；不要改主进程 `.jsm`                                     |
 | 调试  | 安装后 `F12` / `Ctrl+Shift+I`；右下角 **BHC vx.x.x** 角标表示 runtime 已加载 |
@@ -46,7 +46,7 @@ BetterHeyboxChat-plugins/your-plugin/
 
 `id` 必须与目录名相同。`author`、`repository`、`desc` 会显示在设置页（仓库可点开）。`desc` 不超过 100 字，不要写 HTML。`enabled` 是默认值；用户可在设置里关掉，写入 `bhchat.plugins.enabled`，**重启后** loader 才跳过脚本。额外脚本写进 `files`，不要写死 `../betterheyboxchat/plugins/...`。
 
-`minClientVersion` 是**下限**，不是「只支持这一版」。兼容表里更新的客户端（现在是 1.57.1）只要不低于下限就会装、会加载。不要无故把下限抬到最新版。
+`minClientVersion` 是**下限**，不是「只支持这一版」。支持范围内更高的客户端（上沿现在是 1.60.0）只要不低于下限就会装、会加载。不要无故把下限抬到最新版。
 
 用户插件用设置页「插件市场」从在线货架安装，或导入本地 zip/文件夹。文件写到数据目录（默认 `%APPDATA%\BetterHeyboxChat\plugins\<id>\`）。官方示例与第三方投稿都在独立仓，发 PR 即可。
 
@@ -66,20 +66,20 @@ BetterHeyboxChat-plugins/
 
 ## 版本兼容
 
-框架安装器 / loader 的 `SUPPORTED_CLIENT_VERSIONS` 当前是 `1.56.0`、`1.57.0`、`1.57.1`。**文档、框架代码、货架插件都按「表内全部版本」写**，不要写死「仅 1.56」或「仅 1.57」。
+框架安装器 / loader 的支持范围是 **1.56.0~1.60.0**（含两端，常量 `SUPPORTED_CLIENT_RANGE`）。**文档、框架代码、货架插件都按这个范围写**，写成 `1.56.0~1.60.0`，不要逐个列举版本号，也不要写死「仅 1.56」或「仅 1.57」。
 
 | 方向 | 含义 | 做法 |
 | --- | --- | --- |
-| 向后 | 新代码仍能在更旧的**已支持**客户端上跑 | 新 API / 新 DOM / 新 `$rtc` 方法先 `typeof` 探测，没有就降级或提示，不要假设一定有 |
-| 向前 | 旧插件在更新的**已支持**客户端上仍能加载 | `minClientVersion` 只写真正需要的下限；换版本后核对 webpack ID、选择器、Vuex mutation |
+| 向后 | 新代码仍能在范围内更旧的客户端上跑 | 新 API / 新 DOM / 新 `$rtc` 方法先 `typeof` 探测，没有就降级或提示，不要假设一定有 |
+| 向前 | 旧插件在范围内更新的客户端上仍能加载 | `minClientVersion` 只写真正需要的下限；换版本后核对 webpack 入口（框架已改特征探测）、选择器、Vuex mutation |
 
 硬规则：
 
 1. 插件优先走 `BHChat` 稳定面（`mapState` / `watch` / EventBus 经框架、`storage`），不要写死 `__bhchat_require__(数字)`。
-2. 必须碰官方模块或 DOM 时：先确认工厂 / 节点 / 函数存在，再调用。参考 `screen-share-danmaku` 对 `$rtc.tryP2PReupgrade` 的处理。
-3. 1.56 是 Electron 33，1.57.0 / 1.57.1 是 Electron 43。渲染进程 Node API（`http` / `fs`）两边目前都有，但不要依赖某一 Electron 大版本才有的行为。
-4. 文档写能力时列出**实测过的全部版本**；某一版没有的，写「该版无此 API，已降级」，不要写成整插件不可用。
-5. 兼容表新增版本时：先扩 `SUPPORTED_CLIENT_VERSIONS`，再改文档，再逐个插件核对。
+2. 必须碰官方模块或 DOM 时：先确认工厂 / 节点 / 函数存在，再调用。参考 `screen-share-danmaku` 对 `$rtc.tryP2PReupgrade` 的处理。官方导出也可能**被删掉**（例：1.59.0 删了 `decorate` 模块的 `lI`），此时要给出降级结果，不要直接 reject 当整条链路不可用。
+3. 1.56.0 是 Electron 33，1.57.0~1.60.0 是 Electron 43.4.1。渲染进程 Node API（`http` / `fs`）两边目前都有，但不要依赖某一 Electron 大版本才有的行为。
+4. 文档写支持的客户端时写范围 `1.56.0~1.60.0`。某一版没有的能力，写「该版无此 API，已降级」，不要写成整插件不可用。
+5. 支持范围扩大时：先改 `SUPPORTED_CLIENT_RANGE`，再改文档里的范围文案，再逐个插件核对。
 
 ## 最小插件
 

@@ -7,7 +7,7 @@
 
 [黑盒语音](https://chat.xiaoheihe.cn/) **Windows** 客户端增强插件框架  
 
-当前已支持黑盒语音 **1.56.0 / 1.57.0 / 1.57.1**  
+当前已支持黑盒语音 **1.56.0~1.60.0**  
 
 ## 安装
 
@@ -69,7 +69,7 @@ pnpm bhchat install --path "<黑盒语音安装根目录>" --yes
 源文件在 `runtime/`  
 `pnpm build` 会复制一份到 `packages/loader/runtime/`
 
-文档、框架代码、插件都按兼容表全版本写，见 [版本兼容](docs/09-plugin-dev.md#版本兼容)
+文档、框架代码、插件都按支持范围 1.56.0~1.60.0 写，见 [版本兼容](docs/09-plugin-dev.md#版本兼容)
 
 - [怎么写](docs/09-plugin-dev.md)
 - [API](docs/08-plugin-api.md)
