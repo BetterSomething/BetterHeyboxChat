@@ -472,14 +472,25 @@ function cleanupOldInstallers(keepName) {
   } catch (err) {}
 }
 
+function quoteCmdArg(value) {
+  return '"' + String(value).replace(/"/g, '""') + '"';
+}
+
 function launchInstaller(exePath, installRoot) {
   var spawn = require('child_process').spawn;
   var args = ['--reinstall', '--yes'];
   if (installRoot) args.push('--path', String(installRoot));
-  var child = spawn(String(exePath), args, {
+  // 安装器里是 taskkill /F /IM HeyboxChat.exe /T。直接 spawn 的话安装器仍挂在
+  // 黑盒语音的进程树上，/T 会连安装器一起杀掉，文件没写完进程就没了。
+  // 交给 cmd 的 start：cmd 拉起安装器后立即退出，安装器的父进程随之消失，
+  // 不再出现在 taskkill 的进程树里。detached 只能脱离控制台/进程组，改不了 PPID，
+  // 所以这里必须走 start。
+  var command = 'start "" ' + [String(exePath)].concat(args).map(quoteCmdArg).join(' ');
+  var child = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/c', command], {
     detached: true,
     stdio: 'ignore',
-    windowsHide: false,
+    windowsHide: true,
+    windowsVerbatimArguments: true,
   });
   child.unref();
   return { ok: true };
