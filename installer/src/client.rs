@@ -76,12 +76,17 @@ pub fn stop_if_running() -> Result<bool, String> {
 
 #[cfg(windows)]
 mod platform {
+    use std::os::windows::process::CommandExt;
     use std::path::Path;
     use std::process::Command;
+
+    // 安装器是 GUI 进程时，tasklist / taskkill 这类控制台程序会各弹一个窗口。
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
     pub fn is_process_running(image_name: &str) -> bool {
         let output = Command::new("tasklist")
             .args(["/FI", &format!("IMAGENAME eq {image_name}"), "/NH"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output();
 
         match output {
@@ -95,8 +100,12 @@ mod platform {
     }
 
     pub fn kill_process(image_name: &str) -> Result<(), String> {
+        // 不要 /T：自更新时安装器是从黑盒语音拉起的子进程，/T 会把安装器自己也杀掉，
+        // 此时文件还没写完，更新看起来就是「黑盒语音没了但版本没变」。
+        // 黑盒语音的渲染/GPU 等子进程镜像名同样是 HeyboxChat.exe，按镜像名即可全部关闭。
         let status = Command::new("taskkill")
-            .args(["/F", "/IM", image_name, "/T"])
+            .args(["/F", "/IM", image_name])
+            .creation_flags(CREATE_NO_WINDOW)
             .status()
             .map_err(|e| format!("关闭黑盒语音失败: {e}"))?;
 
@@ -108,10 +117,6 @@ mod platform {
     }
 
     pub fn spawn_detached(exe: &Path, work_dir: &Path) -> Result<(), String> {
-        use std::os::windows::process::CommandExt;
-
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
         // `start` 会创建与当前控制台/job 无关的独立进程，避免关闭安装器控制台时连带退出黑盒语音。
         let status = Command::new("cmd")
             .args(["/C", "start", "", "/D", &work_dir.to_string_lossy(), &exe.to_string_lossy()])
