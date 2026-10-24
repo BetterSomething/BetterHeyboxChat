@@ -213,6 +213,8 @@
           localRoot: '',
           loadingCatalog: false,
           progress: null,
+          activeTab: 'catalog',
+          localDebugExpanded: false,
         };
       },
       created: function () {
@@ -709,6 +711,12 @@
         stopBubble: function (e) {
           if (e && e.stopPropagation) e.stopPropagation();
         },
+        setActiveTab: function (tab) {
+          this.activeTab = tab === 'installed' ? 'installed' : 'catalog';
+        },
+        toggleLocalDebug: function () {
+          this.localDebugExpanded = !this.localDebugExpanded;
+        },
       },
       render: function (h) {
         var self = this;
@@ -716,6 +724,28 @@
         var catalogIds = this.selectedCatalogIds();
         var userSelected = this.selectedUserPlugins();
         var children = [
+          h('div', { class: 'bhchat-market-tabs', attrs: { role: 'tablist' } }, [
+            h(
+              'button',
+              {
+                class: { 'bhchat-market-tab': true, active: this.activeTab === 'catalog' },
+                attrs: { type: 'button', role: 'tab', 'aria-selected': this.activeTab === 'catalog' ? 'true' : 'false' },
+                on: { click: function () { self.setActiveTab('catalog'); } },
+              },
+              '在线插件',
+            ),
+            h(
+              'button',
+              {
+                class: { 'bhchat-market-tab': true, active: this.activeTab === 'installed' },
+                attrs: { type: 'button', role: 'tab', 'aria-selected': this.activeTab === 'installed' ? 'true' : 'false' },
+                on: { click: function () { self.setActiveTab('installed'); } },
+              },
+              '已安装',
+            ),
+          ]),
+        ];
+        var catalogView = [
           h('div', { class: 'cell-title' }, '在线货架'),
           h('input', {
             class: 'bhchat-input',
@@ -746,63 +776,83 @@
               this.loadingCatalog ? '拉取中…' : '刷新货架',
             ),
           ]),
-          h('div', { class: 'cell-title' }, '本地调试'),
-          h(
-            'div',
-            {
-              class: 'row bhchat-row-click',
-              on: { click: this.onToggleLocalDebug },
-            },
-            [
-              h('span', '从本地仓读取货架'),
-              h('span', { class: { 'bhchat-switch': true, on: !!this.localDebug } }, [
-                h('span', { class: 'bhchat-switch-core' }),
-              ]),
-            ],
-          ),
-          h('input', {
-            class: 'bhchat-input',
-            attrs: {
-              type: 'text',
-              placeholder: '本地插件仓绝对路径',
-              value: this.localRoot,
-            },
-            on: { input: this.onLocalRootInput },
-          }),
-          h('div', { class: 'bhchat-actions' }, [
+          h('div', { class: 'bhchat-market-section-title' }, [
+            h('div', { class: 'cell-title' }, '本地调试'),
             h(
               'button',
               {
-                class: 'bhchat-btn bhchat-btn-secondary',
-                attrs: { type: 'button' },
-                on: { click: this.onPickLocalRoot },
+                class: 'bhchat-btn bhchat-btn-secondary bhchat-debug-toggle',
+                attrs: { type: 'button', 'aria-expanded': this.localDebugExpanded ? 'true' : 'false' },
+                on: { click: this.toggleLocalDebug },
               },
-              '选择目录',
-            ),
-            h(
-              'button',
-              {
-                class: 'bhchat-btn bhchat-btn-secondary',
-                attrs: { type: 'button', disabled: this.loadingCatalog ? 'disabled' : undefined },
-                on: { click: this.onSaveLocalRoot },
-              },
-              '保存本地路径',
+              this.localDebugExpanded ? '收起' : '展开',
             ),
           ]),
-          h('input', {
-            ref: 'localRootInput',
-            class: 'bhchat-file-hidden',
-            attrs: {
-              type: 'file',
-              webkitdirectory: 'webkitdirectory',
-              directory: 'directory',
-              multiple: 'multiple',
-            },
-            on: { change: this.onLocalRootFolderChange },
-          }),
+          h('p', { class: 'bhchat-debug-hint' }, '调试用，请勿乱填'),
         ];
+        if (this.localDebugExpanded) {
+          catalogView.push(
+            h(
+              'div',
+              {
+                class: 'row bhchat-row-click',
+                on: { click: this.onToggleLocalDebug },
+              },
+              [
+                h('span', '从本地仓读取货架'),
+                h('span', { class: { 'bhchat-switch': true, on: !!this.localDebug } }, [
+                  h('span', { class: 'bhchat-switch-core' }),
+                ]),
+              ],
+            ),
+            h('input', {
+              class: 'bhchat-input',
+              attrs: {
+                type: 'text',
+                placeholder: '本地插件仓绝对路径',
+                value: this.localRoot,
+              },
+              on: { input: this.onLocalRootInput },
+            }),
+            h('div', { class: 'bhchat-actions' }, [
+              h(
+                'button',
+                {
+                  class: 'bhchat-btn bhchat-btn-secondary',
+                  attrs: { type: 'button' },
+                  on: { click: this.onPickLocalRoot },
+                },
+                '选择目录',
+              ),
+              h(
+                'button',
+                {
+                  class: 'bhchat-btn bhchat-btn-secondary',
+                  attrs: { type: 'button', disabled: this.loadingCatalog ? 'disabled' : undefined },
+                  on: { click: this.onSaveLocalRoot },
+                },
+                '保存本地路径',
+              ),
+            ]),
+            h('input', {
+              ref: 'localRootInput',
+              class: 'bhchat-file-hidden',
+              attrs: {
+                type: 'file',
+                webkitdirectory: 'webkitdirectory',
+                directory: 'directory',
+                multiple: 'multiple',
+              },
+              on: { change: this.onLocalRootFolderChange },
+            }),
+          );
+        }
+        var installedView = [];
+        if (this.error) catalogView.push(h('p', { class: 'bhchat-warn' }, this.error));
+        var catalogStatusNode = this.renderStatus(h);
+        if (catalogStatusNode) catalogView.push(catalogStatusNode);
         if (this.catalog.length) {
-          children.push(
+          catalogView.push(
             h('div', { class: 'bhchat-actions' }, [
               h(
                 'button',
@@ -870,9 +920,9 @@
             ],
           );
         });
-        children.push(h('div', { class: 'bhchat-list bhchat-plugin-list no-reset-scrollbar' }, catalogRows));
-        children.push(h('div', { class: 'cell-title' }, '本地安装'));
-        children.push(
+        catalogView.push(h('div', { class: 'bhchat-list bhchat-plugin-list no-reset-scrollbar' }, catalogRows));
+        var localInstallView = [
+          h('div', { class: 'cell-title' }, '本地安装'),
           h('div', { class: 'bhchat-actions' }, [
             h(
               'button',
@@ -893,8 +943,8 @@
               '选择文件夹',
             ),
           ]),
-        );
-        children.push(
+        ];
+        localInstallView.push(
           h('input', {
             ref: 'zipInput',
             class: 'bhchat-file-hidden',
@@ -902,7 +952,7 @@
             on: { change: this.onZipChange },
           }),
         );
-        children.push(
+        localInstallView.push(
           h('input', {
             ref: 'folderInput',
             class: 'bhchat-file-hidden',
@@ -915,12 +965,12 @@
             on: { change: this.onFolderChange },
           }),
         );
-        if (this.error) children.push(h('p', { class: 'bhchat-warn' }, this.error));
-        var statusNode = this.renderStatus(h);
-        if (statusNode) children.push(statusNode);
-        children.push(h('div', { class: 'cell-title' }, '用户插件'));
+        if (this.error) installedView.push(h('p', { class: 'bhchat-warn' }, this.error));
+        var installedStatusNode = this.renderStatus(h);
+        if (installedStatusNode) installedView.push(installedStatusNode);
+        installedView.push(h('div', { class: 'cell-title' }, '用户插件'));
         if (this.userPlugins.length) {
-          children.push(
+          installedView.push(
             h('div', { class: 'bhchat-actions' }, [
               h(
                 'button',
@@ -978,26 +1028,25 @@
             ],
           );
         });
-        children.push(
+        installedView.push(
           h(
             'div',
             { class: 'bhchat-list bhchat-plugin-list no-reset-scrollbar' },
             userRows.length ? userRows : [h('p', { class: 'bhchat-hint' }, '还没有安装的用户插件。')],
           ),
         );
-        children.push(
-          h('div', { class: 'bhchat-actions' }, [
-            h(
-              'button',
-              {
-                class: 'bhchat-btn bhchat-btn-danger',
-                attrs: { type: 'button' },
-                on: { click: this.onRestart },
-              },
-              '立即重启客户端',
-            ),
-          ]),
-        );
+        var restartView = h('div', { class: 'bhchat-actions' }, [
+          h(
+            'button',
+            {
+              class: 'bhchat-btn bhchat-btn-danger',
+              attrs: { type: 'button' },
+              on: { click: this.onRestart },
+            },
+            '立即重启客户端',
+          ),
+        ]);
+        children.push.apply(children, this.activeTab === 'installed' ? installedView.concat(localInstallView, restartView) : catalogView);
         var dialogNode = this.renderDialog(h);
         if (dialogNode) children.push(dialogNode);
         return h('div', children);
@@ -1210,6 +1259,18 @@
     window.BHChat.injectCSS(
       [
         '.betterheyboxchat-setting-block .bhchat-input{width:100%;margin:8px 0;padding:6px 8px;border:1px solid var(--opacity-2,rgba(255,255,255,.18));border-radius:6px;background:var(--fill-input,#1f2225);color:var(--text-1,#fff);box-sizing:border-box}',
+        '.betterheyboxchat-setting-block .bhchat-market-tabs{display:flex;gap:20px;margin:0 0 18px;border-bottom:1px solid var(--opacity-2,rgba(255,255,255,.12))}',
+        '.betterheyboxchat-setting-block .bhchat-market-tab{position:relative;padding:0 0 10px;border:0;background:transparent;color:var(--text-2,#b7bac2);font-size:14px;font-weight:700;cursor:pointer}',
+        '.betterheyboxchat-setting-block .bhchat-market-tab.active{color:var(--text-1,#fff)}',
+        '.betterheyboxchat-setting-block .bhchat-market-tab.active:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:1px;background:var(--brand-fill,#2d7d46)}',
+        '.betterheyboxchat-setting-block .bhchat-market-section-title{display:flex;align-items:center;justify-content:space-between;margin-top:18px}',
+        '.betterheyboxchat-setting-block .bhchat-market-section-title .cell-title{margin:0}',
+        '.betterheyboxchat-setting-block .bhchat-debug-toggle{padding:4px 8px;font-size:12px}',
+        '.betterheyboxchat-setting-block .bhchat-debug-hint{margin:4px 0 8px;color:var(--text-3,#9da2aa);font-size:12px;line-height:18px}',
+        '.betterheyboxchat-setting-block .bhchat-market-tabs + .cell-title{margin-top:0}',
+        'html[theme=light] .betterheyboxchat-setting-block .bhchat-market-tabs,body[theme=light] .betterheyboxchat-setting-block .bhchat-market-tabs{border-bottom-color:var(--opacity-2,#00000014)}',
+        'html[theme=light] .betterheyboxchat-setting-block .bhchat-market-tab,body[theme=light] .betterheyboxchat-setting-block .bhchat-market-tab{color:var(--text-2,#5d626a)}',
+        'html[theme=light] .betterheyboxchat-setting-block .bhchat-market-tab.active,body[theme=light] .betterheyboxchat-setting-block .bhchat-market-tab.active{color:var(--text-1,#000)}',
         'html[theme=light] .betterheyboxchat-setting-block .bhchat-input,body[theme=light] .betterheyboxchat-setting-block .bhchat-input{background:var(--fill-input,#e4e6eb);color:var(--text-1,#000);border-color:var(--opacity-2,#00000014)}',
         '.betterheyboxchat-setting-block .bhchat-check{width:16px;height:16px;margin-right:10px;flex-shrink:0;box-sizing:border-box;border-radius:4px;border:1.5px solid var(--text-3,#8b8d94);background:transparent}',
         '.betterheyboxchat-setting-block .bhchat-check.on{background:var(--brand-fill,#2d7d46);border-color:var(--brand-fill,#2d7d46);box-shadow:inset 0 0 0 2px var(--fill-1,#36393e)}',

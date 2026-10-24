@@ -207,6 +207,16 @@ async function testClientCompat() {
   }
 }
 
+function testMarketplaceLayout() {
+  const source = fs.readFileSync(path.join(root, 'runtime/plugins/marketplace/index.js'), 'utf8');
+  assert(source.includes("activeTab: 'catalog'"), '插件市场应默认显示在线插件标签');
+  assert(source.includes("tab === 'installed'"), '插件市场应支持已安装标签');
+  assert(source.includes('调试用，请勿乱填'), '本地调试区应显示风险提示');
+  assert(source.includes("this.activeTab === 'installed'"), '已安装内容应按标签单独渲染');
+  assert(source.includes('本地安装'), '已安装页应保留本地安装区');
+  assert(source.includes('localDebugExpanded'), '本地调试区应有独立折叠状态');
+}
+
 const steps = [
   ['versioning', testVersioning],
   ['self-update-compare', testSelfUpdateCompare],
@@ -214,6 +224,7 @@ const steps = [
   ['cli-help', testCliHelp],
   ['reinstall', testReinstall],
   ['client-compat', testClientCompat],
+  ['marketplace-layout', testMarketplaceLayout],
 ];
 
 let failed = 0;
