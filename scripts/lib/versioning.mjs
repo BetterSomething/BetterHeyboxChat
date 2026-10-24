@@ -1,5 +1,6 @@
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 const SEMVER_TAG = /^v(\d+\.\d+\.\d+)$/;
+const REPOSITORY_URL = 'https://github.com/BetterSomething/BetterHeyboxChat';
 
 const SECTION_ORDER = ['feat', 'fix', 'perf', 'refactor', 'docs', 'test', 'ci', 'chore', 'style', 'other'];
 const SECTION_TITLES = {
@@ -97,7 +98,14 @@ export function parseCommitSubject(line) {
   return { type, scope: matched[2] || '', subject: matched[3], raw: subject };
 }
 
-export function formatReleaseNotes({ version, channel, previousTag, currentRef, subjects }) {
+export function formatReleaseNotes({
+  version,
+  channel,
+  previousTag,
+  currentRef,
+  subjects,
+  customNotes = '',
+}) {
   const groups = new Map();
   for (const line of subjects || []) {
     const parsed = parseCommitSubject(line);
@@ -113,6 +121,8 @@ export function formatReleaseNotes({ version, channel, previousTag, currentRef, 
       : `BetterHeyboxChat 开发版 \`${version}\``;
 
   const lines = [heading, ''];
+  const custom = String(customNotes || '').trim();
+  if (custom) lines.push(custom, '');
   for (const type of SECTION_ORDER) {
     const items = groups.get(type);
     if (!items || items.length === 0) continue;
@@ -125,7 +135,10 @@ export function formatReleaseNotes({ version, channel, previousTag, currentRef, 
 
   const current = currentRef || (channel === 'release' ? `v${version}` : version);
   if (previousTag && current) {
-    lines.push(`**完整变更:** \`${previousTag}...${current}\``, '');
+    const previousEncoded = encodeURIComponent(previousTag);
+    const currentEncoded = encodeURIComponent(current);
+    const compareUrl = `${REPOSITORY_URL}/compare/${previousEncoded}...${currentEncoded}`;
+    lines.push(`**完整变更:** [${previousTag}...${current}](${compareUrl})`, '');
   } else if (!previousTag && channel === 'release') {
     lines.push('首次正式版。', '');
   }

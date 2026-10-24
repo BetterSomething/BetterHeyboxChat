@@ -10,6 +10,11 @@ on:
         description: Semver without v prefix (e.g. 0.2.0)
         required: true
         type: string
+      custom_notes:
+        description: Markdown 格式的自定义发版内容（会显示在自动变更之前）
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -78,6 +83,8 @@ jobs:
         run: Copy-Item installer/target/release/bhchat-installer.exe $env:ARTIFACT
 
       - name: Release notes
+        env:
+          CUSTOM_RELEASE_NOTES: ${{ inputs.custom_notes }}
         run: node scripts/release-notes.mjs --out release-notes.md
 
       - name: Write update manifest

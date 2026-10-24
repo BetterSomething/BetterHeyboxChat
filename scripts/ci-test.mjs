@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import {
+  formatReleaseNotes,
   formatUpdateNotes,
   installerArtifactName,
   isSemver,
@@ -59,6 +60,26 @@ function testVersioning() {
   assert(notes.includes('第五项多余'), 'feat 优先占满 5 条');
   assert(notes.includes('另有 2 条，见完整说明'), 'fix/perf 超出应计入其余');
   assert(!notes.includes('feat('), '摘要不应保留 conventional 前缀');
+
+  const releaseNotes = formatReleaseNotes({
+    version: '1.2.0',
+    channel: 'release',
+    previousTag: 'v1.1.0',
+    currentRef: 'v1.2.0',
+    subjects: ['feat: 自动生成的功能'],
+    customNotes: '## 本版本特别说明\n\n请先备份配置。',
+  });
+  assert(releaseNotes.includes('## 本版本特别说明'), '发版说明应包含自定义 Markdown');
+  assert(
+    releaseNotes.indexOf('请先备份配置。') < releaseNotes.indexOf('## 新功能'),
+    '自定义内容应位于自动变更之前',
+  );
+  assert(
+    releaseNotes.includes(
+      '[v1.1.0...v1.2.0](https://github.com/BetterSomething/BetterHeyboxChat/compare/v1.1.0...v1.2.0)',
+    ),
+    '完整变更应生成 GitHub Compare 链接',
+  );
 
   const manifest = JSON.parse(renderUpdateJson({
     build: { version: '1.1.0', channel: 'release', commit: 'abc1234' },

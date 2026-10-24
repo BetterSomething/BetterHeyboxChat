@@ -38,6 +38,7 @@ if (isMain()) {
     previousTag: previous,
     currentRef,
     subjects: commitSubjects(root, range),
+    customNotes: process.env.CUSTOM_RELEASE_NOTES || '',
   });
 
   const outIdx = process.argv.indexOf('--out');
