@@ -669,6 +669,7 @@
     var style = document.createElement('style');
     style.id = 'bhchat-native-settings-style';
     style.textContent = [
+      '.cpt-update-dialog .bhchat-update-notice{margin:0 0 8px;padding:6px 10px;border-radius:6px;background:var(--opacity-1,rgba(255,170,0,.12));color:var(--tx-2,inherit);font-size:13px}',
       '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-list{border-radius:5px;overflow:hidden}',
       '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-list.bhchat-plugin-list{max-height:min(42vh,360px);overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--opacity-3,rgba(255,255,255,.35)) transparent}',
       '.cpt-layout-config-content .right-side .block.betterheyboxchat-setting-block .bhchat-plugin-list::-webkit-scrollbar{width:8px;height:8px}',
@@ -957,6 +958,20 @@
     return false;
   }
 
+  // 官方更新弹窗正文里追加的提示：整包热更新会替换 app 目录，BHC 安装可能失效需重装。
+  var OFFICIAL_UPDATE_NOTICE_HTML =
+    '<p class="bhchat-update-notice">注意：更新黑盒语音后，BetterHeyboxChat 可能需要重新安装。</p>';
+
+  function injectOfficialUpdateNotice(vm) {
+    if (!vm || !vm.dialogData || typeof vm.dialogData !== 'object') return false;
+    var data = vm.dialogData;
+    if (data.__bhchat_notice) return true;
+    if (typeof data.version_content !== 'string') data.version_content = '';
+    data.version_content = OFFICIAL_UPDATE_NOTICE_HTML + data.version_content;
+    data.__bhchat_notice = true;
+    return true;
+  }
+
   function restoreOfficialUpdateCancel(vm) {
     if (!vm || !vm.updateConfig) return false;
     if (vm.isUpdating || vm.isExtracting) return false;
@@ -986,6 +1001,9 @@
   function unlockOfficialUpdateDialogEl(el) {
     var vm = findOfficialUpdateDialogVm(el);
     if (!vm) return false;
+    try {
+      injectOfficialUpdateNotice(vm);
+    } catch (err) {}
     if (!restoreOfficialUpdateCancel(vm)) return false;
     if (!vm.__bhchat_update_unlocked) {
       vm.__bhchat_update_unlocked = true;
@@ -1025,6 +1043,10 @@
     if (methods.setUpdateConfig.__bhchat_closable) return true;
     var orig = methods.setUpdateConfig;
     methods.setUpdateConfig = function () {
+      try {
+        // arguments[0] 即 dialogData，先注入再让官方渲染，首次渲染就带提示
+        injectOfficialUpdateNotice(arguments[0] ? { dialogData: arguments[0] } : this);
+      } catch (err) {}
       var result = orig.apply(this, arguments);
       restoreOfficialUpdateCancel(this);
       return result;
