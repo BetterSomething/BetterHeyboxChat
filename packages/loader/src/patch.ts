@@ -216,6 +216,11 @@ function restoreFile(appDir: string, relativePath: string): void {
   const targetPath = path.join(appDir, relativePath);
   const backupPath = path.join(appDir, 'betterheyboxchat', BACKUP_DIR, relativePath);
 
+  if (relativePath.endsWith('index.html')) {
+    restoreIndexHtml(appDir, targetPath, backupPath);
+    return;
+  }
+
   if (fs.existsSync(backupPath)) {
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
     fs.copyFileSync(backupPath, targetPath);
@@ -236,6 +241,67 @@ function restoreFile(appDir: string, relativePath: string): void {
   } else if (relativePath.endsWith('env.js') && /ELECTRON_ENV:\s*'local'/.test(content)) {
     fs.writeFileSync(targetPath, content.replace(/ELECTRON_ENV:\s*'local'/, "ELECTRON_ENV: 'prod'"), 'utf8');
   }
+}
+
+function restoreIndexHtml(appDir: string, targetPath: string, backupPath: string): void {
+  const live = fs.existsSync(targetPath) ? fs.readFileSync(targetPath, 'utf8') : null;
+  if (fs.existsSync(backupPath)) {
+    const backup = fs.readFileSync(backupPath, 'utf8');
+    const liveOfficial = live === null ? null : htmlWithoutSnippet(live);
+    if (preferHtmlBackup(appDir, backup, liveOfficial)) {
+      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+      fs.copyFileSync(backupPath, targetPath);
+      return;
+    }
+  }
+  if (live !== null && live.includes(HTML_MARKER)) {
+    fs.writeFileSync(targetPath, htmlWithoutSnippet(live), 'utf8');
+  }
+}
+
+function htmlWithoutSnippet(content: string): string {
+  return content.split(HTML_SNIPPET).join('');
+}
+
+function preferHtmlBackup(appDir: string, backup: string, liveOfficial: string | null): boolean {
+  if (htmlAssetState(appDir, backup) !== 'missing') return true;
+  return !(liveOfficial !== null && htmlAssetState(appDir, liveOfficial) === 'present');
+}
+
+function htmlAssetState(appDir: string, html: string): 'uncheckable' | 'present' | 'missing' {
+  const refs = htmlLocalAssetRefs(html);
+  if (refs.length === 0) return 'uncheckable';
+  const webapp = path.join(appDir, 'webapp');
+  for (const rel of refs) {
+    const filePath = path.join(webapp, rel);
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return 'missing';
+  }
+  return 'present';
+}
+
+function htmlLocalAssetRefs(html: string): string[] {
+  const refs: string[] = [];
+  const re = /(?:^|\s)(?:src|href)\s*=\s*(["'])(.*?)\1/gi;
+  for (const match of html.matchAll(re)) {
+    const rel = localWebappAsset(match[2]);
+    if (rel) refs.push(rel);
+  }
+  return refs;
+}
+
+function localWebappAsset(value: string): string | null {
+  const pathOnly = value.trim().split(/[?#]/)[0];
+  if (
+    !pathOnly
+    || pathOnly.startsWith('#')
+    || pathOnly.startsWith('/')
+    || pathOnly.startsWith('//')
+    || pathOnly.includes('://')
+    || pathOnly.includes('..')
+  ) {
+    return null;
+  }
+  return pathOnly;
 }
 
 function removeMarkedBlock(content: string, begin: string, end: string): string {

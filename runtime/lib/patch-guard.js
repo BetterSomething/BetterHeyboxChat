@@ -1,5 +1,6 @@
 /**
  * 启动时补回被热更新盖掉的 patch，并按标记拦截官方更新 IPC。
+ * index.html 的 .backup 若还指向已经删掉的入口文件，会改成当前官方页面。
  * 供 main-bridge / preload-bridge 共用（Node 上下文）。
  */
 'use strict';
@@ -30,6 +31,7 @@ var INDEX_SNIPPET = [
 
 var BLOCK_FILE = 'update-block.json';
 var STATUS_FILE = 'patch-status.json';
+var BACKUP_DIR = '.backup';
 var UPDATE_CHECK_PATH = '/chatroom/v2/settings/version/update/check';
 var UPDATE_CONTENT_PATH = '/chatroom/v2/settings/version/content';
 var UPDATE_API_FILTER = ['*://*/chatroom/v2/settings/version/*'];
@@ -166,15 +168,75 @@ function repairEnv(appDir, result) {
   result.envFixed = true;
 }
 
+function stripHtmlSnippet(content) {
+  return String(content || '').split(HTML_SNIPPET).join('');
+}
+
+function htmlLocalAssetRefs(html) {
+  var refs = [];
+  var re = /(?:^|\s)(?:src|href)\s*=\s*(["'])(.*?)\1/gi;
+  var match;
+  while ((match = re.exec(html))) {
+    var rel = localWebappAsset(match[2]);
+    if (rel) refs.push(rel);
+  }
+  return refs;
+}
+
+function localWebappAsset(value) {
+  var pathOnly = String(value || '').trim().split(/[?#]/)[0];
+  if (
+    !pathOnly ||
+    pathOnly.charAt(0) === '#' ||
+    pathOnly.charAt(0) === '/' ||
+    pathOnly.indexOf('//') === 0 ||
+    pathOnly.indexOf('://') !== -1 ||
+    pathOnly.indexOf('..') !== -1
+  ) {
+    return '';
+  }
+  return pathOnly;
+}
+
+function htmlLocalAssetsExist(webappDir, html) {
+  var refs = htmlLocalAssetRefs(html);
+  if (!refs.length) return null;
+  for (var i = 0; i < refs.length; i++) {
+    var filePath = path.join(webappDir, refs[i]);
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return false;
+  }
+  return true;
+}
+
+function syncHtmlBackup(appDir, result) {
+  var runtimeDir = path.join(appDir, 'betterheyboxchat');
+  var livePath = path.join(appDir, 'webapp', 'index.html');
+  if (!fs.existsSync(runtimeDir) || !fs.existsSync(livePath)) return;
+  var official = stripHtmlSnippet(fs.readFileSync(livePath, 'utf8'));
+  var webappDir = path.join(appDir, 'webapp');
+  if (htmlLocalAssetsExist(webappDir, official) !== true) return;
+  var backupPath = path.join(runtimeDir, BACKUP_DIR, 'webapp', 'index.html');
+  if (fs.existsSync(backupPath)) {
+    var backup = fs.readFileSync(backupPath, 'utf8');
+    if (backup === official) return;
+    if (htmlLocalAssetsExist(webappDir, backup) !== false) return;
+  }
+  fs.mkdirSync(path.dirname(backupPath), { recursive: true });
+  fs.writeFileSync(backupPath, official, 'utf8');
+  result.htmlBackupRefreshed = true;
+}
+
 function ensurePatches(appDir) {
   var result = {
     repaired: [],
     intact: [],
     missing: [],
     envFixed: false,
+    htmlBackupRefreshed: false,
     at: new Date().toISOString(),
   };
   repairHtml(appDir, result);
+  syncHtmlBackup(appDir, result);
   repairPreload(appDir, result);
   repairIndexJs(appDir, result);
   repairEnv(appDir, result);

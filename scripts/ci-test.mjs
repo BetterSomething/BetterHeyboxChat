@@ -204,6 +204,25 @@ async function testReinstall() {
     await uninstallPatches(appDir);
     assert(!readPatchState(appDir).installed, '卸载后应为未安装');
     assert(!fs.existsSync(path.join(appDir, 'betterheyboxchat')), '卸载应删除 runtime 目录');
+
+    fs.mkdirSync(path.join(appDir, 'webapp', 'js'), { recursive: true });
+    fs.writeFileSync(path.join(appDir, 'webapp', 'js', 'new.js'), 'new');
+    fs.writeFileSync(
+      path.join(appDir, 'webapp', 'index.html'),
+      '<html><head><script defer="defer" src="js/new.js"></script></head><body></body></html>\n',
+    );
+    await installPatches(install);
+    fs.writeFileSync(path.join(appDir, 'webapp', 'js', 'newer.js'), 'newer');
+    fs.rmSync(path.join(appDir, 'webapp', 'js', 'new.js'));
+    fs.writeFileSync(
+      path.join(appDir, 'webapp', 'index.html'),
+      '<html><head><!-- BetterHeyboxChat:begin --><script src="../betterheyboxchat/webpack-hook.js"></script><script src="../betterheyboxchat/loader.js"></script><script defer="defer" src="js/newer.js"></script></head><body></body></html>\n',
+    );
+    await reinstallPatches(install);
+    const htmlAfterHotfixReinstall = fs.readFileSync(path.join(appDir, 'webapp', 'index.html'), 'utf8');
+    assert(htmlAfterHotfixReinstall.includes('js/newer.js'), '重装应保留热更新后的入口');
+    assert(!htmlAfterHotfixReinstall.includes('js/new.js'), '重装不应回滚到已删除的入口');
+    assert(htmlAfterHotfixReinstall.includes('BetterHeyboxChat'), '重装后应重新注入');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -228,6 +247,37 @@ async function testClientCompat() {
   }
 }
 
+function testHotfixHtmlBackup() {
+  const patchGuard = require('../runtime/lib/patch-guard.js');
+  const tmp = path.join(root, '.tmp-ci-hotfix-html');
+  fs.rmSync(tmp, { recursive: true, force: true });
+  const appDir = path.join(tmp, 'app');
+  const webapp = path.join(appDir, 'webapp');
+  fs.mkdirSync(path.join(webapp, 'js'), { recursive: true });
+  fs.mkdirSync(path.join(appDir, 'betterheyboxchat', '.backup', 'webapp'), { recursive: true });
+  fs.mkdirSync(path.join(appDir, 'source', 'preload'), { recursive: true });
+  fs.writeFileSync(path.join(webapp, 'js', 'new.js'), 'new');
+  fs.writeFileSync(path.join(appDir, 'source', 'preload', 'index.js'), 'console.log("preload");\n');
+  fs.writeFileSync(path.join(appDir, 'index.js'), 'console.log("main");\n');
+  const official = '<html><head><script defer="defer" src="js/new.js"></script></head><body></body></html>';
+  fs.writeFileSync(path.join(webapp, 'index.html'), official);
+  fs.writeFileSync(
+    path.join(appDir, 'betterheyboxchat', '.backup', 'webapp', 'index.html'),
+    '<html><head><script defer="defer" src="js/old.js"></script></head><body></body></html>',
+  );
+
+  const result = patchGuard.ensurePatches(appDir);
+  const backup = fs.readFileSync(path.join(appDir, 'betterheyboxchat', '.backup', 'webapp', 'index.html'), 'utf8');
+  const live = fs.readFileSync(path.join(webapp, 'index.html'), 'utf8');
+  assert(result.htmlBackupRefreshed === true, '过期 index.html 备份应被换成当前页面');
+  assert(backup.includes('js/new.js'), '备份应指向热更新后的入口');
+  assert(!backup.includes('js/old.js'), '备份不应保留已删除的入口');
+  assert(!backup.includes('BetterHeyboxChat'), '备份应是去掉注入后的官方页面');
+  assert(live.includes('BetterHeyboxChat'), '当前页面应补回注入');
+  assert(live.includes('js/new.js'), '当前页面应保留热更新后的入口');
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
 function testMarketplaceLayout() {
   const source = fs.readFileSync(path.join(root, 'runtime/plugins/marketplace/index.js'), 'utf8');
   assert(source.includes("activeTab: 'catalog'"), '插件市场应默认显示在线插件标签');
@@ -244,6 +294,7 @@ const steps = [
   ['map-limit', testMapLimit],
   ['cli-help', testCliHelp],
   ['reinstall', testReinstall],
+  ['hotfix-html-backup', testHotfixHtmlBackup],
   ['client-compat', testClientCompat],
   ['marketplace-layout', testMarketplaceLayout],
 ];

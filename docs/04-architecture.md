@@ -47,7 +47,7 @@ flowchart TB
   - `webapp/index.html` — 先注入 `webpack-hook.js`，再注入 `loader.js`
   - `index.js` — 文件头 `require('./betterheyboxchat/main-bridge.js')`（只挂 app 事件，不替换 `BrowserWindow`）
 - 将仓库 `runtime/` 复制到客户端 `betterheyboxchat/`
-- 卸载时从 `.backup/` 还原
+- 卸载时从 `.backup/` 还原。`index.html` 的备份若引用的本地脚本或样式已经不在磁盘上，而当前页面引用的文件还在，则保留当前页面并去掉注入，不回滚到旧入口
 - GUI 在操作前后可关闭 / 重启 `HeyboxChat.exe`
 
 源文件只改仓库根目录 `runtime/`。`pnpm build` 复制到 `packages/loader/runtime/`。Debug 安装器直接读 `installer/../runtime/`。
@@ -144,7 +144,7 @@ window.BHChat = {
 | 主进程入口 | `index.js` | 头部 require main-bridge |
 | 运行时 | `betterheyboxchat/` | 复制 `runtime/` |
 
-热更新可能覆盖 `webapp`。`main-bridge` 在窗口加载前跑 `ensurePatches`，缺标记就补回 html / preload / index.js。货架插件 `block-update` 阻断 `/chatroom/v2/settings/version/update/check`；main-bridge 用 session webRequest 取消该请求，IPC 只作下载兜底。框架本身不屏蔽检查更新，但会给官方 `force_update` 弹窗补回「取消」（`webpack-hook` 探测 `UpdateDialog`，不写死模块号），避免全新安装时被卡住进不了设置。
+热更新可能覆盖 `webapp`。`main-bridge` 在窗口加载前跑 `ensurePatches`，缺标记就补回 html / preload / index.js。若 `.backup` 里的 `index.html` 引用的本地文件已经消失，而当前页面的引用还在，会把备份换成去掉注入后的当前页面，避免之后重装回滚到旧入口。货架插件 `block-update` 阻断 `/chatroom/v2/settings/version/update/check`；main-bridge 用 session webRequest 取消该请求，IPC 只作下载兜底。框架本身不屏蔽检查更新，但会给官方 `force_update` 弹窗补回「取消」（`webpack-hook` 探测 `UpdateDialog`，不写死模块号），避免全新安装时被卡住进不了设置。
 
 ## 调试
 

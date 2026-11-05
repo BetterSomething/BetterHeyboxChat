@@ -48,6 +48,7 @@
 BHChat.onClientUpdate(function (info) {
   // info.repaired / intact / missing: 相对 app 根的路径
   // info.envFixed: 是否把 ELECTRON_ENV 从 local 改回 prod
+  // info.htmlBackupRefreshed: 是否因热更新把过期的 index.html 备份换成了当前页面
 });
 ```
 

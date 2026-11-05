@@ -364,6 +364,10 @@ fn restore_file(app_dir: &Path, relative_path: &Path) -> Result<(), String> {
         .join(BACKUP_DIR)
         .join(relative_path);
 
+    if relative_path.ends_with("index.html") {
+        return restore_index_html(&app_dir, &target_path, &backup_path);
+    }
+
     if backup_path.is_file() {
         if let Some(parent) = target_path.parent() {
             fs::create_dir_all(parent).map_err(io_err)?;
@@ -396,6 +400,134 @@ fn restore_file(app_dir: &Path, relative_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// 官方热更新会换掉 `index.html` 引用的入口文件并删掉旧文件，`.backup` 仍是安装当时的页面。
+/// 备份里的本地脚本/样式已经不在、当前页面引用的文件还在时，保留当前页面并去掉注入。
+fn restore_index_html(app_dir: &Path, target_path: &Path, backup_path: &Path) -> Result<(), String> {
+    let live = if target_path.is_file() {
+        Some(fs::read_to_string(target_path).map_err(io_err)?)
+    } else {
+        None
+    };
+
+    if backup_path.is_file() {
+        let backup = fs::read_to_string(backup_path).map_err(io_err)?;
+        let live_official = live.as_deref().map(html_without_snippet);
+        if prefer_html_backup(&backup, live_official.as_deref(), app_dir) {
+            if let Some(parent) = target_path.parent() {
+                fs::create_dir_all(parent).map_err(io_err)?;
+            }
+            fs::copy(backup_path, target_path).map_err(io_err)?;
+            return Ok(());
+        }
+    }
+
+    if let Some(content) = live {
+        if content.contains(HTML_MARKER) {
+            fs::write(target_path, html_without_snippet(&content)).map_err(io_err)?;
+        }
+    }
+    Ok(())
+}
+
+fn html_without_snippet(content: &str) -> String {
+    content.replace(HTML_SNIPPET, "")
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum HtmlAssetState {
+    /// 没有可判断的本地相对路径。
+    Uncheckable,
+    Present,
+    Missing,
+}
+
+fn prefer_html_backup(backup: &str, live_official: Option<&str>, app_dir: &Path) -> bool {
+    if html_asset_state(app_dir, backup) != HtmlAssetState::Missing {
+        return true;
+    }
+    match live_official {
+        Some(live) if html_asset_state(app_dir, live) == HtmlAssetState::Present => false,
+        _ => true,
+    }
+}
+
+fn html_asset_state(app_dir: &Path, html: &str) -> HtmlAssetState {
+    let refs = html_local_asset_refs(html);
+    if refs.is_empty() {
+        return HtmlAssetState::Uncheckable;
+    }
+    let webapp = app_dir.join("webapp");
+    for rel in refs {
+        if !webapp.join(rel).is_file() {
+            return HtmlAssetState::Missing;
+        }
+    }
+    HtmlAssetState::Present
+}
+
+fn html_local_asset_refs(html: &str) -> Vec<String> {
+    let mut refs = Vec::new();
+    for attr in ["src", "href"] {
+        for value in html_attr_values(html, attr) {
+            if let Some(rel) = local_webapp_asset(&value) {
+                refs.push(rel);
+            }
+        }
+    }
+    refs
+}
+
+fn local_webapp_asset(value: &str) -> Option<String> {
+    let value = value.trim();
+    let path = value.split(['?', '#']).next().unwrap_or(value);
+    if path.is_empty()
+        || path.starts_with('#')
+        || path.starts_with('/')
+        || path.starts_with("//")
+        || path.contains("://")
+        || path.contains("..")
+    {
+        return None;
+    }
+    Some(path.replace('/', std::path::MAIN_SEPARATOR_STR))
+}
+
+fn html_attr_values(html: &str, attr: &str) -> Vec<String> {
+    let lower = html.to_ascii_lowercase();
+    let key = format!("{attr}=");
+    let bytes = html.as_bytes();
+    let mut values = Vec::new();
+    let mut start = 0;
+    while let Some(rel) = lower[start..].find(&key) {
+        let at = start + rel;
+        let preceded_ok = at == 0 || bytes[at - 1].is_ascii_whitespace();
+        let mut i = at + key.len();
+        if !preceded_ok {
+            start = i;
+            continue;
+        }
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= bytes.len() || (bytes[i] != b'"' && bytes[i] != b'\'') {
+            start = i;
+            continue;
+        }
+        let quote = bytes[i];
+        i += 1;
+        let value_start = i;
+        while i < bytes.len() && bytes[i] != quote {
+            i += 1;
+        }
+        if i >= bytes.len() {
+            break;
+        }
+        values.push(html[value_start..i].to_string());
+        start = i + 1;
+    }
+    values
+}
+
 fn remove_marked_block(content: &str, begin: &str, end: &str) -> String {
     let Some(start) = content.find(begin) else {
         return content.to_string();
@@ -420,5 +552,62 @@ fn io_err(err: io::Error) -> String {
         "权限不足，请以管理员身份运行安装器。".to_string()
     } else {
         err.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture(name: &str) -> PathBuf {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("../.tmp-{name}"));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("webapp/js")).unwrap();
+        fs::create_dir_all(root.join("betterheyboxchat/.backup/webapp")).unwrap();
+        root
+    }
+
+    fn page(script: &str) -> String {
+        format!(r#"<html><head><script defer="defer" src="{script}"></script></head><body></body></html>"#)
+    }
+
+    #[test]
+    fn restore_keeps_hotfixed_html_when_backup_assets_are_gone() {
+        let app = fixture("patch-html-stale");
+        fs::write(app.join("webapp/js/new.js"), "new").unwrap();
+        let live = format!("<head>{}{}", HTML_SNIPPET, page("js/new.js").trim_start_matches("<html><head>"));
+        let live = format!("<html>{live}");
+        fs::write(app.join("webapp/index.html"), &live).unwrap();
+        fs::write(
+            app.join("betterheyboxchat/.backup/webapp/index.html"),
+            page("js/old.js"),
+        )
+        .unwrap();
+
+        restore_file(&app, Path::new("webapp/index.html")).unwrap();
+        let restored = fs::read_to_string(app.join("webapp/index.html")).unwrap();
+        assert!(restored.contains("js/new.js"), "{restored}");
+        assert!(!restored.contains("js/old.js"), "{restored}");
+        assert!(!restored.contains(HTML_MARKER), "{restored}");
+        fs::remove_dir_all(&app).unwrap();
+    }
+
+    #[test]
+    fn restore_uses_backup_when_its_assets_still_exist() {
+        let app = fixture("patch-html-fresh");
+        fs::write(app.join("webapp/js/old.js"), "old").unwrap();
+        fs::write(app.join("webapp/js/new.js"), "new").unwrap();
+        fs::write(app.join("webapp/index.html"), page("js/new.js")).unwrap();
+        fs::write(
+            app.join("betterheyboxchat/.backup/webapp/index.html"),
+            page("js/old.js"),
+        )
+        .unwrap();
+
+        restore_file(&app, Path::new("webapp/index.html")).unwrap();
+        let restored = fs::read_to_string(app.join("webapp/index.html")).unwrap();
+        assert!(restored.contains("js/old.js"), "{restored}");
+        assert!(!restored.contains("js/new.js"), "{restored}");
+        fs::remove_dir_all(&app).unwrap();
     }
 }
