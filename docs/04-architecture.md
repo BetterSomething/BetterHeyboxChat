@@ -76,7 +76,7 @@ flowchart TB
 | EventBus | `$dynamic` + `$jump` + `show-dynamic-dialog` + `timing_collector` |
 | Vuex store | `cur_private_user` + `reply_list_params` + `feedback_reply_params` + `timing_msg_list` |
 
-这些标记在支持范围 `1.56.0~1.60.0` 内各自**唯一**命中。命中后把实际 ID 记进 `window.__bhchat_module_map__`；运行时要按 ID 取模块时用 `window.__bhchat_resolve_id__(kind)`，它会在未命中时重扫一遍并返回空串让调用方降级。这个映射对插件隐藏；插件走 `BHChat` 稳定面，必须碰官方模块时运行时探测导出，不要写死数字 ID。
+这些标记在支持范围 `1.56.0~1.61.0` 内各自**唯一**命中。命中后把实际 ID 记进 `window.__bhchat_module_map__`；运行时要按 ID 取模块时用 `window.__bhchat_resolve_id__(kind)`，它会在未命中时重扫一遍并返回空串让调用方降级。这个映射对插件隐藏；插件走 `BHChat` 稳定面，必须碰官方模块时运行时探测导出，不要写死数字 ID。
 
 ### 3. Preload Bridge
 
@@ -135,7 +135,7 @@ window.BHChat = {
 | Phase 3 在线货架（独立插件仓 `registry.json`） | 已落地（只拉清单，按需下载；市场可改读本地仓） |
 | Phase 3 社区模板、多版本映射 | 已改为特征探测，不再维护 ID 映射表；兼容约定见 [09-plugin-dev.md](./09-plugin-dev.md)「版本兼容」 |
 
-## 关键 Patch 点（1.56.0~1.60.0，路径相同）
+## 关键 Patch 点（1.56.0~1.61.0，路径相同）
 
 | 文件 | 路径（相对 app 根） | 操作 |
 |------|---------------------|------|

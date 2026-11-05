@@ -286,26 +286,55 @@ async function resolveAppDir(
   version: string,
 ): Promise<ClientInstall | null> {
   const versionDir = path.join(installRoot, version);
-  const appDir = path.join(versionDir, 'resources', 'versions', version, 'app');
-  const packageJsonPath = path.join(appDir, 'package.json');
+  const versionsRoot = path.join(versionDir, 'resources', 'versions');
 
-  if (!fs.existsSync(packageJsonPath)) return null;
+  // 官方热更新（整包替换）只改 resources/versions/ 下的目录，外层加载器目录不动：
+  // 外层 1.60.0 + 内层 1.61.0 是常态。所以不假设内外同名，枚举 semver 目录取最高版。
+  let innerDirs: string[] = [];
+  try {
+    innerDirs = fs
+      .readdirSync(versionsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && SEMVER_DIR.test(entry.name))
+      .map((entry) => entry.name)
+      .sort(compareSemver)
+      .reverse();
+  } catch {
+    return null;
+  }
 
-  const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as {
-    name?: string;
-    version?: string;
-    devDependencies?: Record<string, string>;
-  };
+  let appDir: string | null = null;
+  let clientVersion: string | undefined;
+  let electronVersion: string | undefined;
+  for (const inner of innerDirs) {
+    const candidate = path.join(versionsRoot, inner, 'app');
+    const packageJsonPath = path.join(candidate, 'package.json');
+    if (!fs.existsSync(packageJsonPath)) continue;
+    let pkg: {
+      name?: string;
+      version?: string;
+      devDependencies?: Record<string, string>;
+    };
+    try {
+      pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    } catch {
+      continue;
+    }
+    if (pkg.name !== 'heybox-chat-electron') continue;
+    appDir = candidate;
+    clientVersion = pkg.version;
+    electronVersion = pkg.devDependencies?.electron;
+    break;
+  }
 
-  if (pkg.name !== 'heybox-chat-electron') return null;
+  if (appDir === null) return null;
 
   return {
     installRoot: normalizePath(installRoot),
-    version: pkg.version ?? version,
+    version: clientVersion || version,
     versionDir: normalizePath(versionDir),
     appDir: normalizePath(appDir),
-    packageName: pkg.name,
-    electronVersion: pkg.devDependencies?.electron,
+    packageName: 'heybox-chat-electron',
+    electronVersion,
   };
 }
 

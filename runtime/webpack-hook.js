@@ -7,7 +7,7 @@
  * - 设置页组件：config-content-wrapper + switchToBlock + prevent-hide-user-card + cpt-layout-config-content
  * - 设置菜单项数组：about_heychat + feedback_history + InviteSetting + AboutHeychat
  * - 强制更新弹窗：cpt-update-dialog + setUpdateConfig
- * 上述标记在 1.56.0~1.60.0 上各自唯一命中。
+ * 上述标记在 1.56.0~1.61.0 上各自唯一命中。
  */
 (function () {
   'use strict';

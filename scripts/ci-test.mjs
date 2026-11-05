@@ -214,17 +214,17 @@ async function testClientCompat() {
     throw new Error('缺少 packages/loader/dist/patch.js，请先 pnpm build');
   }
   const { assertClientSupported } = await import(pathToFileURL(patchJs).href);
-  for (const version of ['1.56.0', '1.57.1', '1.58.2', '1.60.0']) {
+  for (const version of ['1.56.0', '1.57.1', '1.58.2', '1.60.0', '1.61.0']) {
     assertClientSupported(version);
   }
-  for (const version of ['1.55.9', '1.60.1', '1.99.0']) {
+  for (const version of ['1.55.9', '1.61.1', '1.99.0']) {
     let rejected = false;
     try {
       assertClientSupported(version);
     } catch (err) {
-      rejected = String(err && err.message).includes('支持范围：1.56.0~1.60.0');
+      rejected = String(err && err.message).includes('支持范围：1.56.0~1.61.0');
     }
-    assert(rejected, `应拒绝 ${version}，并提示支持范围 1.56.0~1.60.0`);
+    assert(rejected, `应拒绝 ${version}，并提示支持范围 1.56.0~1.61.0`);
   }
 }
 

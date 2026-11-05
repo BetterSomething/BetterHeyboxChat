@@ -60,7 +60,7 @@ ${MARKER_END}
 `.trim();
 
 /** 黑盒客户端支持范围（含两端）。文档和报错都用这一串，不要再逐个列版本。 */
-export const SUPPORTED_CLIENT_RANGE = '1.56.0~1.60.0';
+export const SUPPORTED_CLIENT_RANGE = '1.56.0~1.61.0';
 
 function parseClientVersion(version: string): number[] | null {
   const text = String(version || '').trim();

@@ -26,7 +26,7 @@ try { require('./betterheyboxchat/main-bridge.js'); } catch (e) { console.error(
 // BetterHeyboxChat:end";
 
 /// 黑盒客户端支持范围（含两端）。文档和报错都用这一串，不要再逐个列版本。
-pub const SUPPORTED_CLIENT_RANGE: &str = "1.56.0~1.60.0";
+pub const SUPPORTED_CLIENT_RANGE: &str = "1.56.0~1.61.0";
 
 fn parse_client_version(version: &str) -> Option<Vec<u64>> {
     if version.is_empty() {
@@ -88,10 +88,10 @@ mod tests {
 
     #[test]
     fn supported_range_includes_bounds_and_gaps() {
-        for version in ["1.56.0", "1.57.1", "1.58.2", "1.60.0"] {
+        for version in ["1.56.0", "1.57.1", "1.58.2", "1.60.0", "1.61.0"] {
             assert!(is_supported_client_version(version), "{version} 应在支持范围内");
         }
-        for version in ["1.55.9", "1.60.1", "2.0.0", "", "dev"] {
+        for version in ["1.55.9", "1.61.1", "2.0.0", "", "dev"] {
             assert!(
                 !is_supported_client_version(version),
                 "{version} 不应在支持范围内"

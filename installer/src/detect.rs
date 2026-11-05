@@ -288,38 +288,63 @@ fn is_semver(name: &str) -> bool {
 
 fn resolve_app_dir(install_root: &Path, version: &str) -> Option<ClientInstall> {
     let version_dir = install_root.join(version);
-    let app_dir = version_dir
-        .join("resources")
-        .join("versions")
-        .join(version)
-        .join("app");
-    let package_json_path = app_dir.join("package.json");
+    let versions_root = version_dir.join("resources").join("versions");
 
-    if !package_json_path.is_file() {
-        return None;
+    // 官方热更新（整包替换）只改 resources/versions/ 下的目录，外层加载器目录不动：
+    // 外层 1.60.0 + 内层 1.61.0 是常态。所以不假设内外同名，枚举 semver 目录取最高版。
+    let mut inner_dirs: Vec<String> = fs::read_dir(&versions_root)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.path().is_dir())
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| is_semver(name))
+        .collect();
+    inner_dirs.sort_by(|a, b| compare_semver(a, b).reverse());
+
+    let mut app_dir = None;
+    let mut client_version = None;
+    for inner in &inner_dirs {
+        let candidate = versions_root.join(inner).join("app");
+        let package_json_path = candidate.join("package.json");
+        if !package_json_path.is_file() {
+            continue;
+        }
+        let Ok(content) = fs::read_to_string(&package_json_path) else {
+            continue;
+        };
+        let Ok(pkg) = serde_json::from_str::<PackageJson>(&content) else {
+            continue;
+        };
+        if pkg.name != "heybox-chat-electron" {
+            continue;
+        }
+        app_dir = Some(candidate);
+        client_version = Some(pkg.version);
+        break;
     }
 
-    let content = fs::read_to_string(&package_json_path).ok()?;
-    let pkg: PackageJson = serde_json::from_str(&content).ok()?;
-
-    if pkg.name != "heybox-chat-electron" {
-        return None;
-    }
-
-    let electron_version = pkg.dev_dependencies.get("electron").cloned();
+    let app_dir = app_dir?;
+    let client_version = client_version?;
+    let electron_version = read_electron_version(&app_dir);
 
     Some(ClientInstall {
         install_root: normalize_path(install_root),
-        version: if pkg.version.is_empty() {
+        version: if client_version.is_empty() {
             version.to_string()
         } else {
-            pkg.version
+            client_version
         },
         version_dir: normalize_path(&version_dir),
         app_dir: normalize_path(&app_dir),
-        package_name: pkg.name,
+        package_name: "heybox-chat-electron".to_string(),
         electron_version,
     })
+}
+
+fn read_electron_version(app_dir: &Path) -> Option<String> {
+    let content = fs::read_to_string(app_dir.join("package.json")).ok()?;
+    let pkg: PackageJson = serde_json::from_str(&content).ok()?;
+    pkg.dev_dependencies.get("electron").cloned()
 }
 
 fn compare_semver(a: &str, b: &str) -> std::cmp::Ordering {
@@ -349,5 +374,78 @@ pub fn format_client_version(install: &ClientInstall) -> String {
         format!("{} (Electron {}, {})", install.version, electron, arch)
     } else {
         format!("{} ({})", install.version, arch)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn write_client(install_root: &Path, outer: &str, inner: &str, pkg_version: &str) {
+        let app = install_root
+            .join(outer)
+            .join("resources")
+            .join("versions")
+            .join(inner)
+            .join("app");
+        fs::create_dir_all(&app).unwrap();
+        fs::write(
+            app.join("package.json"),
+            format!(
+                r#"{{"name":"heybox-chat-electron","version":"{pkg_version}","devDependencies":{{"electron":"43.4.1"}}}}"#
+            ),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn hot_update_layout_inner_dir_differs_from_outer() {
+        let tmp = std::env::temp_dir().join("bhchat-detect-test-hotupdate");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        // 官方热更新布局：外层加载器目录 1.60.0 不动，内层整包换成 1.61.0
+        write_client(&tmp, "1.60.0", "1.61.0", "1.61.0");
+
+        let install = resolve_install_from_root(&tmp).expect("应能识别热更新布局");
+        assert_eq!(install.version, "1.61.0");
+        assert!(install
+            .app_dir
+            .to_string_lossy()
+            .ends_with(r"1.60.0\resources\versions\1.61.0\app"));
+        assert_eq!(install.electron_version.as_deref(), Some("43.4.1"));
+
+        fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn classic_layout_still_works() {
+        let tmp = std::env::temp_dir().join("bhchat-detect-test-classic");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        // 旧布局：内外同名
+        write_client(&tmp, "1.60.0", "1.60.0", "1.60.0");
+
+        let install = resolve_install_from_root(&tmp).expect("应能识别传统同名布局");
+        assert_eq!(install.version, "1.60.0");
+
+        fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    #[test]
+    fn picks_highest_inner_version_when_multiple() {
+        let tmp = std::env::temp_dir().join("bhchat-detect-test-multi");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        write_client(&tmp, "1.60.0", "1.59.0", "1.59.0");
+        write_client(&tmp, "1.60.0", "1.61.0", "1.61.0");
+
+        let install = resolve_install_from_root(&tmp).expect("应取内层最高版本");
+        assert_eq!(install.version, "1.61.0");
+
+        fs::remove_dir_all(&tmp).unwrap();
     }
 }
