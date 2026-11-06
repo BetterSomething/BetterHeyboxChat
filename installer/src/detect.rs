@@ -442,9 +442,16 @@ mod tests {
 
         write_client(&tmp, "1.60.0", "1.59.0", "1.59.0");
         write_client(&tmp, "1.60.0", "1.61.0", "1.61.0");
+        // 未来的官方更新：目录名和 package.json 版本都超出当前已实测版本，
+        // 探测逻辑不能假设任何版本上限。
+        write_client(&tmp, "1.60.0", "2.3.4", "2.3.4");
 
         let install = resolve_install_from_root(&tmp).expect("应取内层最高版本");
-        assert_eq!(install.version, "1.61.0");
+        assert_eq!(install.version, "2.3.4");
+        assert!(install
+            .app_dir
+            .to_string_lossy()
+            .ends_with(r"1.60.0\resources\versions\2.3.4\app"));
 
         fs::remove_dir_all(&tmp).unwrap();
     }

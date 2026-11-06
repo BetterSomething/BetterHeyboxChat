@@ -59,8 +59,12 @@ try { require('./betterheyboxchat/main-bridge.js'); } catch (e) { console.error(
 ${MARKER_END}
 `.trim();
 
-/** 黑盒客户端支持范围（含两端）。文档和报错都用这一串，不要再逐个列版本。 */
-export const SUPPORTED_CLIENT_RANGE = '1.56.0~1.61.0';
+/**
+ * 黑盒客户端最低支持版本（含）。只有下限，不设上限：
+ * 官方更新后只要探测出的版本不低于此值就允许安装，由运行时做能力探测降级。
+ * 文档和报错都用这一串，不要再逐个列版本。
+ */
+export const MIN_SUPPORTED_CLIENT_VERSION = '1.56.0';
 
 function parseClientVersion(version: string): number[] | null {
   const text = String(version || '').trim();
@@ -85,12 +89,10 @@ function compareClientVersionParts(left: number[], right: number[]): number {
 }
 
 export function isSupportedClientVersion(version: string): boolean {
-  const [minText, maxText] = SUPPORTED_CLIENT_RANGE.split('~');
   const current = parseClientVersion(version);
-  const min = parseClientVersion(minText || '');
-  const max = parseClientVersion(maxText || '');
-  if (!current || !min || !max) return false;
-  return compareClientVersionParts(current, min) >= 0 && compareClientVersionParts(current, max) <= 0;
+  const min = parseClientVersion(MIN_SUPPORTED_CLIENT_VERSION);
+  if (!current || !min) return false;
+  return compareClientVersionParts(current, min) >= 0;
 }
 
 export const PROGRAM_FILES_FOLDERS = ['Program Files', 'Program Files (x86)'];

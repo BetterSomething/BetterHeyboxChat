@@ -6,8 +6,8 @@ import {
   INDEX_SNIPPET,
   LOADER_VERSION,
   MARKER_BEGIN,
+  MIN_SUPPORTED_CLIENT_VERSION,
   PRELOAD_SNIPPET,
-  SUPPORTED_CLIENT_RANGE,
   isSupportedClientVersion,
 } from './constants.js';
 import { getRuntimeSourceDir } from './detect.js';
@@ -52,7 +52,7 @@ export function readPatchState(appDir: string): PatchState {
 export function assertClientSupported(version: string): void {
   if (!isSupportedClientVersion(version)) {
     throw new Error(
-      `客户端版本 ${version} 不在支持范围内。支持范围：${SUPPORTED_CLIENT_RANGE}`,
+      `客户端版本 ${version} 暂不支持。最低支持版本：${MIN_SUPPORTED_CLIENT_VERSION} 及以上`,
     );
   }
 }

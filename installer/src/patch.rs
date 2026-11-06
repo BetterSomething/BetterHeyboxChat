@@ -2,7 +2,7 @@ use crate::client::{restart_heybox_if_was_running, stop_if_running};
 use crate::userdata;
 use crate::constants::{
     BACKUP_DIR, HTML_MARKER, HTML_SNIPPET, INDEX_SNIPPET, LOADER_VERSION, MANIFEST_FILE,
-    MARKER_BEGIN, MARKER_END, PRELOAD_SNIPPET, SUPPORTED_CLIENT_RANGE,
+    MARKER_BEGIN, MARKER_END, MIN_SUPPORTED_CLIENT_VERSION, PRELOAD_SNIPPET,
     is_supported_client_version,
 };
 use crate::path_util::normalize_path;
@@ -56,7 +56,7 @@ pub fn assert_client_supported(version: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "客户端版本 {version} 不在支持范围内。支持范围：{SUPPORTED_CLIENT_RANGE}"
+            "客户端版本 {version} 暂不支持。最低支持版本：{MIN_SUPPORTED_CLIENT_VERSION} 及以上"
         ))
     }
 }

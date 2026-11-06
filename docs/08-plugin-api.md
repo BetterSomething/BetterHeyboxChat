@@ -2,10 +2,10 @@
 
 > 全局对象：`window.BHChat`  
 > 实现：`runtime/runtime.js`  
-> 兼容客户端：Heybox Chat **1.56.0~1.61.0**（与安装器 / loader 的 `SUPPORTED_CLIENT_RANGE` 对齐）  
+> 兼容客户端：Heybox Chat **1.56.0 及以上**（与安装器 / loader 的 `MIN_SUPPORTED_CLIENT_VERSION` 对齐）
 > 写法示例见 [09-plugin-dev.md](./09-plugin-dev.md)
 
-插件只应依赖本页列出的稳定面。`window.__bhchat_require__`、`window.__bhchat_module_map__` 是内部实现，换版本可能失效。同一份插件必须能在支持范围 **1.56.0~1.61.0** 内的客户端上加载；某一版本没有的 API 要探测后降级，不要写成「仅某某版本」。
+插件只应依赖本页列出的稳定面。`window.__bhchat_require__`、`window.__bhchat_module_map__` 是内部实现，换版本可能失效。同一份插件必须能在最低支持版本 1.56.0 及以上的客户端上加载（无上限）；某一版本没有的 API 要探测后降级，不要写成「仅某某版本」。
 
 ## 元数据
 

@@ -25,8 +25,9 @@ pub const INDEX_SNIPPET: &str = r"// BetterHeyboxChat:begin
 try { require('./betterheyboxchat/main-bridge.js'); } catch (e) { console.error('[BetterHeyboxChat] main bridge failed:', e); }
 // BetterHeyboxChat:end";
 
-/// 黑盒客户端支持范围（含两端）。文档和报错都用这一串，不要再逐个列版本。
-pub const SUPPORTED_CLIENT_RANGE: &str = "1.56.0~1.61.0";
+/// 黑盒客户端最低支持版本（含）。只有下限，不设上限：
+/// 官方更新后只要探测出的版本不低于此值就允许安装，由运行时做能力探测降级。
+pub const MIN_SUPPORTED_CLIENT_VERSION: &str = "1.56.0";
 
 fn parse_client_version(version: &str) -> Option<Vec<u64>> {
     if version.is_empty() {
@@ -60,20 +61,13 @@ fn cmp_client_version(left: &[u64], right: &[u64]) -> std::cmp::Ordering {
 }
 
 pub fn is_supported_client_version(version: &str) -> bool {
-    let Some((min_text, max_text)) = SUPPORTED_CLIENT_RANGE.split_once('~') else {
-        return false;
-    };
     let Some(current) = parse_client_version(version) else {
         return false;
     };
-    let Some(min) = parse_client_version(min_text) else {
-        return false;
-    };
-    let Some(max) = parse_client_version(max_text) else {
+    let Some(min) = parse_client_version(MIN_SUPPORTED_CLIENT_VERSION) else {
         return false;
     };
     cmp_client_version(&current, &min) != std::cmp::Ordering::Less
-        && cmp_client_version(&current, &max) != std::cmp::Ordering::Greater
 }
 
 pub const HEYBOX_DISPLAY_NAME_HINTS: &[&str] =
@@ -87,11 +81,14 @@ mod tests {
     use super::is_supported_client_version;
 
     #[test]
-    fn supported_range_includes_bounds_and_gaps() {
-        for version in ["1.56.0", "1.57.1", "1.58.2", "1.60.0", "1.61.0"] {
+    fn supported_range_has_only_a_lower_bound() {
+        for version in [
+            "1.56.0", "1.56.1", "1.57.1", "1.58.2", "1.60.0", "1.61.0", "1.61.1", "1.99.0",
+            "2.0.0", "10.0.0",
+        ] {
             assert!(is_supported_client_version(version), "{version} 应在支持范围内");
         }
-        for version in ["1.55.9", "1.61.1", "2.0.0", "", "dev"] {
+        for version in ["1.55.9", "1.55.99", "0.9.9", "", "dev", "1.56.0-beta"] {
             assert!(
                 !is_supported_client_version(version),
                 "{version} 不应在支持范围内"
